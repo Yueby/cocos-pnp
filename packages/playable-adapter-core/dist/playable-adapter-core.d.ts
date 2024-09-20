@@ -62,20 +62,14 @@ type TAdapterRC = {
 declare type TMode = 'parallel' | 'serial';
 
 declare type TOptions = {
-	buildFolderPath: string;
-	adapterBuildConfig?: TAdapterRC | null;
+    buildFolderPath: string;
+    adapterBuildConfig?: TAdapterRC | null;
 };
-declare const exec2xAdapter: (
-	options: TOptions,
-	config?: {
-		mode: TMode;
-	}
-) => Promise<void>;
-declare const exec3xAdapter: (
-	options: TOptions,
-	config?: {
-		mode: TMode;
-	}
-) => Promise<void>;
+declare const exec2xAdapter: (options: TOptions, config?: {
+    mode: TMode;
+}) => Promise<void>;
+declare const exec3xAdapter: (options: TOptions, config?: {
+    mode: TMode;
+}) => Promise<void>;
 
 export { TAdapterRC, TChannel, TPlatform, TWebOrientations, exec2xAdapter, exec3xAdapter };

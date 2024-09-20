@@ -26,10 +26,10 @@ Cocos 广告试玩多渠道导出插件
 	"enableSplash": "false",
 	"injectOptions": {
 		"Unity": {
-			"body": "<script> var iosUrl = '<ios>'; var androidUrl = '<android>'; function showAds() { var userAgent = navigator.userAgent || navigator.vendor; if (userAgent.match(/iPad/i) || userAgent.match(/iPhone/i) || userAgent.match(/iPod/i)) { url = iosUrl; } else if (userAgent.match(/Android/i)) { url = androidUrl; } else { url = iosUrl; } try { mraid.open(url); } catch (e) { console.error(e); var isMac = /macintosh|mac os x/i.test(navigator.userAgent); var isWindows = /windows|win32/i.test(navigator.userAgent); if (isMac) { url = iosUrl; } else if (isWindows) { url = androidUrl; } window.open(url); } } </script>"
+			"body": "<script> var iosUrl = '<ios>'; var androidUrl = '<android>'; function showAds() {} </script>"
 		},
 		"Liftoff": {
-			"body": "<script> var iosUrl = '<ios>'; var androidUrl = '<android>'; function showAds() { var userAgent = navigator.userAgent || navigator.vendor; if (userAgent.match(/iPad/i) || userAgent.match(/iPhone/i) || userAgent.match(/iPod/i)) { url = iosUrl; } else if (userAgent.match(/Android/i)) { url = androidUrl; } else { url = iosUrl; } try { mraid.open(url); } catch (e) { console.error(e); var isMac = /macintosh|mac os x/i.test(navigator.userAgent); var isWindows = /windows|win32/i.test(navigator.userAgent); if (isMac) { url = iosUrl; } else if (isWindows) { url = androidUrl; } window.open(url); } } </script>",
+			"body": "<script> var iosUrl = '<ios>'; var androidUrl = '<android>'; function showAds() {} </script>",
 			"inZip": true
 		},
 		"Tiktok": {
