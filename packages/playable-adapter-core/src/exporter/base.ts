@@ -1,6 +1,6 @@
 import path, { basename, extname, join } from 'path';
 import { CheerioAPI, load } from 'cheerio';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rename, rmdirSync, statSync, unlink, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rename, renameSync, rmdirSync, statSync, unlink, unlinkSync, writeFileSync } from 'fs';
 import { MAX_ZIP_SIZE, REPLACE_SYMBOL } from '@/constants';
 import { injectFromRCJson } from '@/helpers/dom';
 import { TBuilderOptions, TResourceData, TZipFromSingleFileOptions } from '@/typings';
@@ -9,7 +9,7 @@ import { writeToPath, readToPath, getOriginPkgPath, copyDirToPath, replaceGlobal
 import { deflate } from 'pako';
 import { jszipCode } from '@/helpers/injects';
 import JSZip, { file } from 'jszip';
-import { stat } from 'fs/promises';
+import { rmdir, stat } from 'fs/promises';
 
 const FILE_MAX_SIZE = MAX_ZIP_SIZE * 0.8;
 
@@ -311,11 +311,7 @@ export const readDir = (zip: JSZip | null, nowPath: string): void => {
 export const readFile = (zip: JSZip | null, filePath: string, fileName: string): void => {
 	if (extname(filePath) === '.html' && fileName !== 'index.html') {
 		let newPath = path.join(path.dirname(filePath), `index.html`);
-		rename(filePath, newPath, (err) => {
-			if (err) {
-				console.error(`Error rename file: ${err}`);
-			}
-		});
+		renameSync(filePath, newPath);
 
 		filePath = newPath;
 		fileName = basename(filePath);
