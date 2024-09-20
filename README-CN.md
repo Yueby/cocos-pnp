@@ -4,7 +4,41 @@ Cocos 广告试玩多渠道导出插件
 
 ## 该 Fork 修改
 
-为了适配自己的工作流，作出了可自定义导出文件名、自定义HTML标题名、对IOS和Android的URL进行提取，并通过\<ios>/\<android>标签来injectOptions属性中Channel的Body字符串进行替换
+为了适配自己的工作流，作出了以下修改：
+
+-   自定义导出文件名
+-   自定义 HTML 标题名
+-   自定义 IOS 和 Android 平台的 URL，并通过\<ios>和\<android>标签对 injectOptions 属性中 Channel 的 Body 字符串进行替换
+-   为 TChanelRC 增加 inZip 属性，用作导出时，将该网络自动打包成一个.zip 压缩包，html 文件会被自动重命名为 index.html
+
+下面为部分修改内容:
+
+```typescript
+export type TChannelRC = {
+	head: string;
+	body: string;
+	sdkScript: string;
+	inZip: boolean;
+};
+
+export type TAdapterRC = {
+	fileName?: string;
+	title?: string;
+	iosUrl?: string;
+	androidUrl?: string;
+	buildPlatform?: TPlatform;
+	orientation?: TWebOrientations;
+	skipBuild?: boolean;
+	exportChannels?: TChannel[];
+	enableSplash?: boolean;
+	injectOptions?: {
+		[key in TChannel]: TChannelRC;
+	};
+	tinify?: boolean;
+	tinifyApiKey?: string;
+	isZip?: boolean;
+};
+```
 
 `.adapterrc` 文件示例：
 
@@ -15,13 +49,7 @@ Cocos 广告试玩多渠道导出插件
 	"iosUrl": "***",
 	"androidUrl": "***",
 	"buildPlatform": "web-mobile",
-	"exportChannels": [
-		"Unity",
-		"Liftoff",
-		"Tiktok",
-		"Moloco",
-		"IronSource"
-	],
+	"exportChannels": ["Unity", "Liftoff", "Tiktok", "Moloco", "IronSource"],
 	"orientation": "auto",
 	"enableSplash": "false",
 	"injectOptions": {
@@ -47,8 +75,9 @@ Cocos 广告试玩多渠道导出插件
 	"tinifyApiKey": "*********",
 	"isZip": true
 }
-
 ```
+
+## 以下为原 Readme 内容
 
 ## 插件使用
 
