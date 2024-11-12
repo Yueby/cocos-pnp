@@ -124,7 +124,7 @@ const fillCodeToHTML = ($: CheerioAPI, options: TBuilderOptions) => {
 export const exportSingleFile = async (singleFilePath: string, options: TBuilderOptions) => {
 	const { channel, transformHTML, transform } = options;
 
-	console.info(`【${channel}】adaptation started`);
+	console.info(`[适配] 开始适配 ${channel} 渠道`);
 	const { fileName } = getAdapterRCJson() || {};
 	const singleHtml = readToPath(singleFilePath, 'utf-8');
 	const targetPath = join(getGlobalProjectBuildPath(), `${fileName}${channel.toLowerCase()}.html`);
@@ -152,13 +152,13 @@ export const exportSingleFile = async (singleFilePath: string, options: TBuilder
 		await createZip(getGlobalProjectBuildPath(), [targetPath], `${fileName}${channel.toLowerCase()}`, zip);
 	}
 
-	console.info(`【${channel}】adaptation completed`);
+	console.info(`[适配] ${channel} 渠道适配完成`);
 };
 
 export const exportZipFromPkg = async (options: TBuilderOptions) => {
 	const { channel, transformHTML, transform } = options;
 
-	console.info(`【${channel}】adaptation started`);
+	console.info(`[适配] 开始适配 ${channel} 渠道`);
 	const { fileName } = getAdapterRCJson() || {};
 	// Copy the folder.
 	const originPkgPath = getOriginPkgPath();
@@ -193,14 +193,14 @@ export const exportZipFromPkg = async (options: TBuilderOptions) => {
 		await createZip(getGlobalProjectBuildPath(), [destPath], `${fileName}${channel.toLowerCase()}`, zip);
 	}
 
-	console.info(`【${channel}】adaptation completed`);
+	console.info(`[适配] ${channel} 渠道适配完成`);
 };
 
 export const exportDirZipFromSingleFile = async (singleFilePath: string, options: TZipFromSingleFileOptions) => {
 	const { channel, transformHTML, transform, transformScript, resMapper, compDiff } = options;
 
-	console.info(`【${channel}】adaptation started`);
-	const { fileName } = getAdapterRCJson() || {};
+	console.info(`[适配] 开始适配 ${channel} 渠道`);
+	const { fileName} = getAdapterRCJson() || {};
 	// Copy the folder.
 	const singleHtmlPath = singleFilePath;
 	const projectBuildPath = getGlobalProjectBuildPath();
@@ -254,7 +254,7 @@ export const exportDirZipFromSingleFile = async (singleFilePath: string, options
 		await createZip(getGlobalProjectBuildPath(), [destPath], `${fileName}${channel.toLowerCase()}`, zip);
 	}
 
-	console.info(`【${channel}】adaptation completed`);
+	console.info(`[适配] ${channel} 渠道适配完成`);
 };
 
 //打包成一个zip文件

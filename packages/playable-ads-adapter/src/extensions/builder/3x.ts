@@ -7,7 +7,7 @@ import { exec3xAdapter } from 'playable-adapter-core';
 import workPath from '../worker/3x?worker';
 import { join } from 'path';
 
-const setupWorker = (params: { buildFolderPath: string; adapterBuildConfig: TAdapterRC }, successCb: Function, failCb: Function) => {
+const setupWorker = (params: { buildFolderPath: string; adapterBuildConfig: TAdapterRC; }, successCb: Function, failCb: Function) => {
 	const { Worker } = require('worker_threads');
 
 	console.log('支持Worker，将开启子线程适配');
@@ -97,10 +97,10 @@ export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
 
 export const builder3x = async () => {
 	try {
-		// 初始化 start
 		const { buildPlatform, projectRootPath, projectBuildPath } = getAdapterConfig();
-		// 初始化 end
-		console.log(`开始构建项目，导出${buildPlatform}包`);
+		console.info('开始构建项目');
+		console.info(`【构建平台】${buildPlatform}`);
+
 		const isSkipBuild = getRCSkipBuild();
 		const buildPath = join(projectRootPath, projectBuildPath);
 
@@ -114,8 +114,8 @@ export const builder3x = async () => {
 			platform: buildPlatform
 		});
 		shell.openPath(buildPath);
-		console.log('构建完成');
+		console.info('构建完成');
 	} catch (error) {
-		console.error(error);
+		console.error('构建失败:', error);
 	}
 };
