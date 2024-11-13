@@ -11,7 +11,7 @@ export const readAdapterRCFile = (): TAdapterRC | null => {
 	const adapterRCJsonPath = `${projectRootPath}${ADAPTER_RC_PATH}`;
 	if (existsSync(adapterRCJsonPath)) {
 		let config = <TAdapterRC>JSON.parse(readToPath(adapterRCJsonPath));
-	
+
 		if (config.injectOptions) {
 			for (const channel in config.injectOptions) {
 				if (config.injectOptions.hasOwnProperty(channel)) {
@@ -68,7 +68,7 @@ export const getRCSkipBuild = (): boolean => {
 	return adapterRCJson.skipBuild ?? false;
 };
 
-export const getRCTinify = (): { tinify: boolean; tinifyApiKey: string } => {
+export const getRCTinify = (): { tinify: boolean; tinifyApiKey: string; } => {
 	const adapterRCJson = getAdapterRCJson();
 	if (!adapterRCJson) {
 		return {

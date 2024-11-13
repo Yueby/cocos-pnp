@@ -34,7 +34,7 @@ export const exec2xAdapter = async (options: TOptions, config?: { mode: TMode; }
 
   const { orientation = 'auto' } = getAdapterRCJson() || {};
   const { mode = 'parallel' } = config ?? { mode: 'parallel' };
-  
+
   console.info('[打包] 开始生成渠道包');
   await gen2xChannelsPkg({
     orientation,
@@ -42,7 +42,7 @@ export const exec2xAdapter = async (options: TOptions, config?: { mode: TMode; }
     compDiff
   }, mode);
   console.info('[打包] 渠道包生成完成');
-  
+
   unmountGlobalVars();
   console.info('[构建] 构建完成');
 };
@@ -67,7 +67,7 @@ export const exec3xAdapter = async (options: TOptions, config?: { mode: TMode; }
 
   const { orientation = 'auto' } = getAdapterRCJson() || {};
   const { mode = 'parallel' } = config ?? { mode: 'parallel' };
-  
+
   console.info('【生成渠道包】');
   await gen3xChannelsPkg({
     orientation,
@@ -75,6 +75,6 @@ export const exec3xAdapter = async (options: TOptions, config?: { mode: TMode; }
     compDiff
   }, mode);
   console.info('渠道包生成完成');
-  
+
   unmountGlobalVars();
 };
