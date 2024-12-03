@@ -1,1 +1,1 @@
-"use strict";module.exports={description:"Playable Ads Adapter"};
+"use strict";module.exports={description:"Playable Ads Adapter",build:"Build Playable Ads"};
