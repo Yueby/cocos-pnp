@@ -4,7 +4,7 @@
   "description": "i18n:playable-ads-adapter.description",
   "main": "./main.js",
   "editor": ">=3.3.0",
-  "author": "ppgee",
+  "author": "ppgee & yueby",
   "contributions": {
     "builder": "./main.js",
     "menu": [
