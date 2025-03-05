@@ -9,7 +9,6 @@ Cocos 广告试玩多渠道导出插件
 -   自定义导出文件名
 -   自定义 HTML 标题名
 -   自定义 IOS 和 Android 平台的 URL，并通过\<ios>和\<android>标签对 injectOptions 属性中 Channel 的 Body 字符串进行替换
--   为 TChanelRC 增加 inZip 属性，用作导出时，将该网络自动打包成一个.zip 压缩包，html 文件会被自动重命名为 index.html
 
 下面为部分修改内容:
 
@@ -18,7 +17,6 @@ export type TChannelRC = {
 	head: string;
 	body: string;
 	sdkScript: string;
-	inZip: boolean;
 };
 
 export type TAdapterRC = {
@@ -44,10 +42,10 @@ export type TAdapterRC = {
 
 ```json
 {
-	"fileName": "test_fileName",
-	"title": "Test_Title",
-	"iosUrl": "***",
-	"androidUrl": "***",
+	"fileName": "your_fileName",
+	"title": "your_title",
+	"iosUrl": "your_url",
+	"androidUrl": "your_url",
 	"buildPlatform": "web-mobile",
 	"exportChannels": ["Unity", "Liftoff", "Tiktok", "Moloco", "IronSource"],
 	"orientation": "auto",
@@ -57,22 +55,20 @@ export type TAdapterRC = {
 			"body": "<script> var iosUrl = '<ios>'; var androidUrl = '<android>'; function showAds() {} </script>"
 		},
 		"Liftoff": {
-			"body": "<script> var iosUrl = '<ios>'; var androidUrl = '<android>'; function showAds() {} </script>",
-			"inZip": true
+			"body": "<script> var iosUrl = '<ios>'; var androidUrl = '<android>'; function showAds() {} </script>"
 		},
 		"Tiktok": {
-			"body": "<script>function showAds() {window.openAppStore();}</script>",
-			"inZip": true
+			"body": "<script>function showAds() {}</script>"
 		},
 		"Moloco": {
-			"body": "<script>function showAds() {FbPlayableAd.onCTAClick(); }</script>"
+			"body": "<script>function showAds() {}</script>"
 		},
 		"IronSource": {
-			"body": "<script>function showAds() { dapi.openStoreUrl(); }</script>"
+			"body": "<script>function showAds() {}</script>"
 		}
 	},
 	"tinify": true,
-	"tinifyApiKey": "*********",
+	"tinifyApiKey": "your_key",
 	"isZip": true
 }
 ```
