@@ -5,14 +5,12 @@ import { jszipCode } from '@/helpers/injects';
 import { TBuilderOptions, TResourceData, TZipFromSingleFileOptions } from '@/typings';
 import { copyDirToPath, getAdapterRCJson, getOriginPkgPath, readToPath, replaceGlobalSymbol, writeToPath } from '@/utils';
 import { CheerioAPI, load } from 'cheerio';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rename, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import JSZip from 'jszip';
 import { deflate } from 'pako';
 import path, { basename, extname, join } from 'path';
 
 const FILE_MAX_SIZE = MAX_ZIP_SIZE * 0.8;
-
-const zip = new JSZip();
 
 const globalReplacer = (options: Pick<TBuilderOptions, 'channel' | 'resMapper'> & { $: CheerioAPI }) => {
 	const { channel, resMapper } = options;
@@ -124,149 +122,170 @@ export const exportSingleFile = async (singleFilePath: string, options: TBuilder
 	const { channel, transformHTML, transform } = options;
 
 	console.info(`[适配] 开始适配 ${channel} 渠道`);
-	const { fileName } = getAdapterRCJson() || {};
-	const singleHtml = readToPath(singleFilePath, 'utf-8');
-	const targetPath = join(getGlobalProjectBuildPath(), `${fileName}${channel.toLowerCase()}.html`);
+	const { fileName = '' } = getAdapterRCJson() || {};
 
-	// Replace global variables.
-	let $ = load(singleHtml);
-	fillCodeToHTML($, options);
+	try {
+		const singleHtml = readToPath(singleFilePath, 'utf-8');
+		const targetPath = join(getGlobalProjectBuildPath(), `${fileName}${channel.toLowerCase()}.html`);
 
-	// Inject additional configuration.
-	await injectFromRCJson($, channel);
-	writeToPath(targetPath, $.html());
+		// Replace global variables.
+		let $ = load(singleHtml);
+		fillCodeToHTML($, options);
 
-	if (transformHTML) {
-		await transformHTML($);
+		// Inject additional configuration.
+		await injectFromRCJson($, channel);
 		writeToPath(targetPath, $.html());
-	}
 
-	if (transform) {
-		await transform(targetPath);
-	}
+		if (transformHTML) {
+			await transformHTML($);
+			writeToPath(targetPath, $.html());
+		}
 
-	console.info(`[适配] ${channel} 渠道适配完成`);
+		if (transform) {
+			await transform(targetPath);
+		}
+
+		console.info(`[适配] ${channel} 渠道适配完成`);
+	} catch (error) {
+		console.error(`[适配] ${channel} 渠道适配失败:`, error);
+		throw error;
+	}
 };
 
 export const exportZipFromPkg = async (options: TBuilderOptions) => {
 	const { channel, transformHTML, transform } = options;
 
 	console.info(`[适配] 开始适配 ${channel} 渠道`);
-	const { fileName } = getAdapterRCJson() || {};
-	// Copy the folder.
-	const originPkgPath = getOriginPkgPath();
-	const projectBuildPath = getGlobalProjectBuildPath();
-	const destPath = join(projectBuildPath, `${fileName}${channel.toLowerCase()}`);
-	copyDirToPath(originPkgPath, destPath);
+	const { fileName = '' } = getAdapterRCJson() || {};
 
-	// Replace global variables.
-	replaceGlobalSymbol(destPath, channel);
+	try {
+		// Copy the folder.
+		const originPkgPath = getOriginPkgPath();
+		const projectBuildPath = getGlobalProjectBuildPath();
+		const destPath = join(projectBuildPath, `${fileName}${channel.toLowerCase()}`);
+		copyDirToPath(originPkgPath, destPath);
 
-	// Inject additional configuration.
-	const singleHtmlPath = join(destPath, '/index.html');
-	const singleHtml = readToPath(singleHtmlPath, 'utf-8');
-	const $ = load(singleHtml);
-	await injectFromRCJson($, channel);
+		// Replace global variables.
+		replaceGlobalSymbol(destPath, channel);
 
-	// Add the SDK script.
-	if (transformHTML) {
-		await transformHTML($);
+		// Inject additional configuration.
+		const singleHtmlPath = join(destPath, '/index.html');
+		const singleHtml = readToPath(singleHtmlPath, 'utf-8');
+		const $ = load(singleHtml);
+		await injectFromRCJson($, channel);
+
+		// Add the SDK script.
+		if (transformHTML) {
+			await transformHTML($);
+		}
+
+		// Update the HTML file.
+		writeToPath(singleHtmlPath, $.html());
+
+		if (transform) {
+			await transform(destPath);
+		}
+
+		// 创建新的JSZip实例
+		const newZip = new JSZip();
+
+		// Pack in zip
+		await createZip(getGlobalProjectBuildPath(), [destPath], `${fileName}${channel.toLowerCase()}`, newZip);
+
+		console.info(`[适配] ${channel} 渠道适配完成`);
+	} catch (error) {
+		console.error(`[适配] ${channel} 渠道适配失败:`, error);
+		throw error;
 	}
-
-	// Update the HTML file.
-	writeToPath(singleHtmlPath, $.html());
-
-	if (transform) {
-		await transform(destPath);
-	}
-
-	// Pack in zip
-	await createZip(getGlobalProjectBuildPath(), [destPath], `${fileName}${channel.toLowerCase()}`, zip);
-
-	console.info(`[适配] ${channel} 渠道适配完成`);
 };
 
 export const exportZipFromSingleFile = async (singleFilePath: string, options: TZipFromSingleFileOptions) => {
 	const { channel, transformHTML, transform, transformScript, exportType } = options;
 
 	console.info(`[适配] 开始适配 ${channel} 渠道`);
-	const { fileName } = getAdapterRCJson() || {};
-	// Copy the folder.
-	const singleHtmlPath = singleFilePath;
-	const projectBuildPath = getGlobalProjectBuildPath();
-	const destPath = join(projectBuildPath, `${fileName}${channel.toLowerCase()}`);
+	const { fileName = '' } = getAdapterRCJson() || {};
 
-	// Create destination directory
-	mkdirSync(destPath, { recursive: true });
+	try {
+		// Copy the folder.
+		const singleHtmlPath = singleFilePath;
+		const projectBuildPath = getGlobalProjectBuildPath();
+		const destPath = join(projectBuildPath, `${fileName}${channel.toLowerCase()}`);
 
-	// HTML file path.
-	const htmlPath = join(destPath, '/index.html');
-
-	let $ = load(readToPath(singleHtmlPath, 'utf-8'));
-	fillCodeToHTML($, options);
-
-	// Inject configuration file.
-	await injectFromRCJson($, channel);
-
-	// To extract all scripts and generate a JavaScript file
-	const scriptNodes = $('body script[type!="systemjs-importmap"]');
-
-	if (exportType === 'dirZip') {
-		// Create a "js" directory.
-		const jsDirname = '/js';
-		const jsDirPath = join(destPath, jsDirname);
-		mkdirSync(jsDirPath, { recursive: true });
-
-		// Process scripts and move them to js directory
-		for (let index = 0; index < scriptNodes.length; index++) {
-			const scriptNode = $(scriptNodes[index]);
-			if (transformScript) {
-				await transformScript(scriptNode);
-			}
-			let jsStr = scriptNode.text();
-			const jsFileName = `index${index}.js`;
-			const jsPath = join(jsDirPath, jsFileName);
-			scriptNode.replaceWith(`<script src=".${jsDirname}/${jsFileName}"></script>`);
-			writeToPath(jsPath, jsStr);
-		}
-	} else {
-		// For zip type, keep all files in the same directory
-		// Make sure the destination directory exists
+		// Create destination directory
 		mkdirSync(destPath, { recursive: true });
 
-		for (let index = 0; index < scriptNodes.length; index++) {
-			const scriptNode = $(scriptNodes[index]);
-			if (transformScript) {
-				await transformScript(scriptNode);
+		// HTML file path.
+		const htmlPath = join(destPath, '/index.html');
+
+		let $ = load(readToPath(singleHtmlPath, 'utf-8'));
+		fillCodeToHTML($, options);
+
+		// Inject configuration file.
+		await injectFromRCJson($, channel);
+
+		// To extract all scripts and generate a JavaScript file
+		const scriptNodes = $('body script[type!="systemjs-importmap"]');
+
+		if (exportType === 'dirZip') {
+			// Create a "js" directory.
+			const jsDirname = '/js';
+			const jsDirPath = join(destPath, jsDirname);
+			mkdirSync(jsDirPath, { recursive: true });
+
+			// Process scripts and move them to js directory
+			for (let index = 0; index < scriptNodes.length; index++) {
+				const scriptNode = $(scriptNodes[index]);
+				if (transformScript) {
+					await transformScript(scriptNode);
+				}
+				let jsStr = scriptNode.text();
+				const jsFileName = `index${index}.js`;
+				const jsPath = join(jsDirPath, jsFileName);
+				scriptNode.replaceWith(`<script src=".${jsDirname}/${jsFileName}"></script>`);
+				writeToPath(jsPath, jsStr);
 			}
-			let jsStr = scriptNode.text();
-			const jsFileName = `index${index}.js`;
-			const jsPath = join(destPath, jsFileName);
-			scriptNode.replaceWith(`<script src="./${jsFileName}"></script>`);
-			writeToPath(jsPath, jsStr);
+		} else {
+			// For zip type, keep all files in the same directory
+
+			for (let index = 0; index < scriptNodes.length; index++) {
+				const scriptNode = $(scriptNodes[index]);
+				if (transformScript) {
+					await transformScript(scriptNode);
+				}
+				let jsStr = scriptNode.text();
+				const jsFileName = `index${index}.js`;
+				const jsPath = join(destPath, jsFileName);
+				scriptNode.replaceWith(`<script src="./${jsFileName}"></script>`);
+				writeToPath(jsPath, jsStr);
+			}
 		}
-	}
 
-	// Add base tag to ensure correct resource paths
-	if ($('head base').length === 0) {
-		$('head').prepend('<base href="./">');
-	}
+		// Add base tag to ensure correct resource paths
+		if ($('head base').length === 0) {
+			$('head').prepend('<base href="./">');
+		}
 
-	writeToPath(htmlPath, $.html());
-
-	if (transformHTML) {
-		await transformHTML($);
 		writeToPath(htmlPath, $.html());
+
+		if (transformHTML) {
+			await transformHTML($);
+			writeToPath(htmlPath, $.html());
+		}
+
+		if (transform) {
+			await transform(destPath);
+		}
+
+		// Pack in zip
+		const newZip = new JSZip();
+
+		await createZip(getGlobalProjectBuildPath(), [destPath], `${fileName}${channel.toLowerCase()}`, newZip);
+
+		console.info(`[适配] ${channel} 渠道适配完成`);
+	} catch (error) {
+		console.error(`[适配] ${channel} 渠道适配失败:`, error);
+		throw error;
 	}
-
-	if (transform) {
-		await transform(destPath);
-	}
-
-	// Pack in zip
-	await createZip(getGlobalProjectBuildPath(), [destPath], `${fileName}${channel.toLowerCase()}`, zip);
-
-	console.info(`[适配] ${channel} 渠道适配完成`);
 };
 
 //打包成一个zip文件
@@ -275,62 +294,153 @@ export const createZip = async (destPath: string, filePaths: string[], zipName: 
 		throw new Error('[创建zip文件] filePath array is empty.');
 	}
 
-	// 遍历文件路径数组
-	for (let filePath of filePaths) {
-		// 检查文件是否存在
-		if (!existsSync(filePath)) {
-			console.error(`[创建zip文件] file ${filePath} not exists.`);
-			continue;
+	try {
+		// 遍历文件路径数组
+		for (let filePath of filePaths) {
+			// 检查文件是否存在
+			if (!existsSync(filePath)) {
+				console.error(`[创建zip文件] file ${filePath} not exists.`);
+				continue;
+			}
+
+			if (lstatSync(filePath).isDirectory()) {
+				readDir(zip, filePath, false);
+			} else {
+				readFile(zip, filePath, basename(filePath), false);
+			}
+		}
+		// 生成 zip 文件的内容
+		const zipContent = await zip!.generateAsync({ type: 'nodebuffer' });
+
+		// 将 zip 内容写入到文件中
+		let file_path = path.join(destPath, `${zipName}.zip`);
+
+		try {
+			// 检查文件是否存在，如果存在则先尝试删除
+			if (existsSync(file_path)) {
+				try {
+					unlinkSync(file_path);
+				} catch (err: any) {
+					if (err.code === 'EBUSY') {
+						throw new Error(`文件 ${file_path} 正在被其他程序使用，无法覆盖。请关闭可能正在使用该文件的程序后重试。`);
+					}
+					throw err;
+				}
+			}
+
+			writeFileSync(file_path, new Uint8Array(zipContent));
+			console.info(`[创建zip文件] 成功创建zip文件: ${file_path}`);
+		} catch (err: any) {
+			if (err.code === 'EBUSY') {
+				console.error(`文件 ${file_path} 正在被其他程序使用，无法写入。请关闭可能正在使用该文件的程序后重试。`);
+				throw err;
+			} else {
+				throw err;
+			}
 		}
 
-		if (lstatSync(filePath).isDirectory()) {
-			readDir(zip, filePath);
+		// 现在可以安全地删除原始文件
+		for (let filePath of filePaths) {
+			if (existsSync(filePath)) {
+				if (lstatSync(filePath).isDirectory()) {
+					readDir(zip, filePath, true);
+				} else {
+					readFile(zip, filePath, basename(filePath), true);
+				}
+			}
+		}
+
+		return file_path;
+	} catch (error) {
+		console.error('[创建zip文件] 创建zip文件失败:', error);
+		throw error;
+	}
+};
+
+export const readDir = (zip: JSZip | null, nowPath: string, shouldDelete: boolean = true): void => {
+	try {
+		let files = readdirSync(nowPath);
+
+		files.forEach(function (fileName, index) {
+			let filePath = nowPath + '/' + fileName;
+			try {
+				let file = statSync(filePath);
+
+				if (file.isDirectory()) {
+					let dirlist = zip!.folder(fileName);
+					readDir(dirlist, filePath, shouldDelete);
+				} else {
+					readFile(zip, filePath, fileName, shouldDelete);
+				}
+			} catch (error: any) {
+				if (error.code === 'EBUSY') {
+					console.error(`文件 ${filePath} 正在被其他程序使用，无法访问。请关闭可能正在使用该文件的程序后重试。`);
+				} else {
+					throw error;
+				}
+			}
+		});
+
+		// 只有在shouldDelete为true时才删除目录
+		if (shouldDelete && existsSync(nowPath)) {
+			try {
+				rmdirSync(nowPath);
+			} catch (error: any) {
+				if (error.code === 'EBUSY') {
+					console.error(`目录 ${nowPath} 正在被其他程序使用，无法删除。请关闭可能正在使用该目录的程序后重试。`);
+				} else if (error.code === 'ENOTEMPTY') {
+					console.warn(`目录 ${nowPath} 不为空，无法删除。这可能是因为某些文件被锁定或正在使用。`);
+				} else {
+					throw error;
+				}
+			}
+		}
+	} catch (error: any) {
+		if (error.code === 'EBUSY') {
+			console.error(`目录 ${nowPath} 正在被其他程序使用，无法读取。请关闭可能正在使用该目录的程序后重试。`);
 		} else {
-			readFile(zip, filePath, basename(filePath));
+			throw error;
 		}
 	}
-	// 生成 zip 文件的内容
-	const zipContent = await zip!.generateAsync({ type: 'nodebuffer' });
-
-	// 将 zip 内容写入到文件中
-	let file_path = path.join(destPath, `${zipName}.zip`);
-	writeFileSync(file_path, new Uint8Array(zipContent));
-	rename(file_path, path.join(destPath, `${zipName}.zip`), (err) => {
-		if (err) {
-			console.error(`[创建zip文件] Error moving file: ${err}`);
-		}
-	});
 };
 
-export const readDir = (zip: JSZip | null, nowPath: string): void => {
-	let files = readdirSync(nowPath);
-
-	files.forEach(function (fileName, index) {
-		let filePath = nowPath + '/' + fileName;
-		let file = statSync(filePath);
-
-		if (file.isDirectory()) {
-			let dirlist = zip!.folder(fileName);
-			readDir(dirlist, filePath);
-		} else {
-			readFile(zip, filePath, fileName);
-		}
-	});
-
-	rmdirSync(nowPath);
-};
-
-export const readFile = (zip: JSZip | null, filePath: string, fileName: string): void => {
+export const readFile = (zip: JSZip | null, filePath: string, fileName: string, shouldDelete: boolean = true): void => {
 	if (extname(filePath) === '.html' && fileName !== 'index.html') {
 		let newPath = path.join(path.dirname(filePath), `index.html`);
-		renameSync(filePath, newPath);
-
-		filePath = newPath;
-		fileName = basename(filePath);
+		try {
+			renameSync(filePath, newPath);
+			filePath = newPath;
+			fileName = basename(filePath);
+		} catch (error: any) {
+			if (error.code === 'EBUSY') {
+				console.error(`文件 ${filePath} 正在被其他程序使用，无法重命名。请关闭可能正在使用该文件的程序后重试。`);
+			} else {
+				throw error;
+			}
+		}
 	}
 
-	const fileContent = readFileSync(filePath);
-	zip!.file(fileName, new Uint8Array(fileContent));
+	try {
+		const fileContent = readFileSync(filePath);
+		zip!.file(fileName, new Uint8Array(fileContent));
+	} catch (error: any) {
+		if (error.code === 'EBUSY') {
+			console.error(`文件 ${filePath} 正在被其他程序使用，无法读取。请关闭可能正在使用该文件的程序后重试。`);
+		} else {
+			throw error;
+		}
+	}
 
-	unlinkSync(filePath);
+	// 只有在shouldDelete为true时才删除文件
+	if (shouldDelete && existsSync(filePath)) {
+		try {
+			unlinkSync(filePath);
+		} catch (error: any) {
+			if (error.code === 'EBUSY') {
+				console.error(`文件 ${filePath} 正在被其他程序使用，无法删除。请关闭可能正在使用该文件的程序后重试。`);
+			} else {
+				throw error;
+			}
+		}
+	}
 };

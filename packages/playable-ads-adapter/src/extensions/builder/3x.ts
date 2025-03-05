@@ -1,11 +1,11 @@
-import { shell } from 'electron';
-import { IBuildTaskOption, Platform } from '~types/packages/builder/@types';
-import { run } from 'node-cmd';
 import { BUILDER_NAME } from '@/extensions/constants';
 import { checkOSPlatform, getAdapterConfig, getRCSkipBuild, getRealPath } from '@/extensions/utils';
-import { exec3xAdapter } from 'playable-adapter-core';
-import workPath from '../worker/3x?worker';
+import { shell } from 'electron';
+import { run } from 'node-cmd';
 import { join } from 'path';
+import { exec3xAdapter } from 'playable-adapter-core';
+import { IBuildTaskOption } from '~types/packages/builder/@types';
+import workPath from '../worker/3x?worker';
 
 const setupWorker = (params: { buildFolderPath: string; adapterBuildConfig: TAdapterRC; }, successCb: Function, failCb: Function) => {
 	const { Worker } = require('worker_threads');

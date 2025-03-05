@@ -4,6 +4,7 @@
   "description": "i18n:playable-ads-adapter.description",
   "main": "./main.js",
   "devDependencies": {
+    "@cocos/creator-types": "^3.8.5",
     "@rollup/plugin-alias": "^4.0.2",
     "@rollup/plugin-commonjs": "^23.0.0",
     "@rollup/plugin-json": "^5.0.0",

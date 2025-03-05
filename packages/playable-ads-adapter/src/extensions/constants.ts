@@ -6,6 +6,6 @@ export const COCOS_EDITOR_EVENT: { [key: string]: Editor.ListenEvent } = {
 
 export const BUILDER_NAME = 'playable-ads-adapter'
 
-export const ADAPTER_RC_PATH = '/.adapterrc'
+export const ADAPTER_RC_PATH = '/.adapterrc.json'
 
 export const SETTINGS_PROJECT_PATH = '/settings/project.json'

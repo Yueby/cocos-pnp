@@ -5,6 +5,7 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import isBuiltin from 'is-builtin-module';
+import { join } from 'path';
 import copy from 'rollup-plugin-copy';
 import pkgJson from './package.json';
 import cocosPluginUpdater from './plugins/cocos-plugin-updater';
@@ -19,7 +20,10 @@ const is2xBuilder = builderVersion === '2x';
 export default {
   input: {
     main: `src/main${builderVersion}.ts`,
-    ...(is2xBuilder ? {} : { hooks: `src/hooks.ts` })
+    ...(is2xBuilder ? {} : {
+      hooks: `src/hooks.ts`,
+      panel: 'src/panel.ts'
+    })
   },
   output: {
     dir: outputDir,
@@ -31,8 +35,8 @@ export default {
     terser(),
     alias({
       entries: [
-        { find: '@', replacement: __dirname + '/src' },
-        { find: '~types', replacement: __dirname + '@types' }
+        { find: '@', replacement: join(__dirname, 'src') },
+        { find: '~types', replacement: join(__dirname, '@types') }
       ]
     }),
     json(),

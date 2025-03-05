@@ -3,9 +3,8 @@
 /// <reference types='node' />
 /// <reference path='./extension.d.ts'/>
 
+import { BrowserWindow, FileFilter, MessageBoxReturnValue, OpenDialogReturnValue, SaveDialogReturnValue } from 'electron';
 import * as NodeJSPath from 'path';
-import { EventEmitter } from 'events';
-import { FileFilter, BrowserWindow, OpenDialogReturnValue, SaveDialogReturnValue, MessageBoxReturnValue } from 'electron';
 
 declare global {
     export namespace Editor {
@@ -1222,6 +1221,11 @@ declare global {
              * @experimental 实验性质。
              */
             export function importProjectModule(url: string): Promise<unknown>;
+        }
+        export namespace Builder {
+            function on(event: ListenEvent, callback: Function): void;
+            function once(event: ListenEvent, callback: Function): void;
+            function removeListener(event: ListenEvent, callback: Function): void;
         }
     }
 }

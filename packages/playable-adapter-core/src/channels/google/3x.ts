@@ -1,7 +1,7 @@
 import { exportZipFromSingleFile } from '@/exporter/3x';
 import { TChannel, TChannelPkgOptions } from '@/typings';
 import { getChannelRCSdkScript } from '@/utils';
-import { AD_SDK_SCRIPT, LANDSCAPE_META, PORTRAIT_META } from './inject-vars';
+import { AD_SDK_SCRIPT, AUTO_META, LANDSCAPE_META, PORTRAIT_META } from './inject-vars';
 
 export const export3xGoogle = async (options: TChannelPkgOptions) => {
 	const { orientation } = options;
@@ -12,7 +12,13 @@ export const export3xGoogle = async (options: TChannelPkgOptions) => {
 		channel,
 		transformHTML: async ($) => {
 			// 增加横竖屏meta
-			const orientationStr = orientation === 'landscape' ? LANDSCAPE_META : PORTRAIT_META;
+			const orientationMap = {
+				'landscape': LANDSCAPE_META,
+				'portrait': PORTRAIT_META,
+				'auto': AUTO_META
+			};
+			// 使用映射获取对应的meta，如果不存在则默认使用竖屏
+			const orientationStr = orientationMap[orientation] || PORTRAIT_META;
 			$(orientationStr).appendTo('head');
 
 			// 加入广告sdk脚本
@@ -26,6 +32,6 @@ export const export3xGoogle = async (options: TChannelPkgOptions) => {
 		//   await zipToPath(destPath)
 		//   unlinkSync(destPath)
 		// }
-		exportType: 'dirZip'
+		exportType: 'zip'
 	});
 };

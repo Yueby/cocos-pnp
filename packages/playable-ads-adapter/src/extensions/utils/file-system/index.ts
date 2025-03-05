@@ -1,3 +1,4 @@
-export * from './project'
-export * from './base'
-export * from './adapterrc'
+export * from './adapterrc';
+export * from './base';
+export * from './project';
+
