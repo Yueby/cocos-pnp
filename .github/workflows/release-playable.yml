@@ -1,6 +1,7 @@
 name: Release-Playable
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - playable-ads-adapter-[0-9]+.*

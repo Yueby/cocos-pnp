@@ -1,5 +1,5 @@
 {
-  "version": "1.3.10",
+  "version": "1.3.17",
   "name": "playable-ads-adapter",
   "description": "i18n:playable-ads-adapter.description",
   "main": "./main.js",
@@ -19,7 +19,7 @@
     "typescript": "^4.8.4",
     "uglify-js": "^3.17.4"
   },
-  "author": "ppgee",
+  "author": "ppgee & yueby",
   "scripts": {
     "clear": "rm -rf dist/",
     "watch": "rollup -c -w",

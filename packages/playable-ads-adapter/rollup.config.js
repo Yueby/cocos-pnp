@@ -1,20 +1,20 @@
-import pkgJson from './package.json'
-import commonjs from '@rollup/plugin-commonjs'
-import copy from 'rollup-plugin-copy'
-import cocosPluginUpdater from './plugins/cocos-plugin-updater'
-import cocosPluginWorker from './plugins/cocos-plugin-worker'
-import { nodeResolve } from '@rollup/plugin-node-resolve'
-import isBuiltin from 'is-builtin-module';
-import json from '@rollup/plugin-json'
-import typescript from '@rollup/plugin-typescript';
+import alias from '@rollup/plugin-alias';
+import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
-import alias from '@rollup/plugin-alias'
+import typescript from '@rollup/plugin-typescript';
+import isBuiltin from 'is-builtin-module';
+import copy from 'rollup-plugin-copy';
+import pkgJson from './package.json';
+import cocosPluginUpdater from './plugins/cocos-plugin-updater';
+import cocosPluginWorker from './plugins/cocos-plugin-worker';
 
-const appName = pkgJson.name
-const appVersion = pkgJson.version
-const outputDir = `dist/${appName}`
-const builderVersion = process.env.BUILD_VERSION || '2x'
-const is2xBuilder = builderVersion === '2x'
+const appName = pkgJson.name;
+const appVersion = pkgJson.version;
+const outputDir = `dist/${appName}`;
+const builderVersion = process.env.BUILD_VERSION || '2x';
+const is2xBuilder = builderVersion === '2x';
 
 export default {
   input: {
@@ -50,9 +50,9 @@ export default {
           dest: outputDir,
           rename: 'package.json',
           transform: (contents) => {
-            const tempPkgJson = JSON.parse(contents.toString('utf-8'))
-            tempPkgJson.version = appVersion
-            return JSON.stringify(tempPkgJson, null, 2)
+            const tempPkgJson = JSON.parse(contents.toString('utf-8'));
+            tempPkgJson.version = appVersion;
+            return JSON.stringify(tempPkgJson, null, 2);
           }
         },
         { src: 'i18n/**/*', dest: `${outputDir}/i18n` }
@@ -62,8 +62,8 @@ export default {
     cocosPluginWorker(),
     cocosPluginUpdater({
       src: `${__dirname}/${outputDir}`,
-      dest: `~/.CocosCreator/${is2xBuilder ? 'packages' : 'extensions'}/${appName}`
+      dest: `/d/Develop/CocosCreator/${is2xBuilder ? 'packages' : 'extensions'}/${appName}`
     }),
   ],
   external: ['fs', 'path', 'os', 'electron']
-}
+};

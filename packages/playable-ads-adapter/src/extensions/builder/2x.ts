@@ -74,14 +74,13 @@ export const initBuildFinishedEvent = async (options: TBuildOptions, callback?: 
 }
 
 export const builder2x = () => {
-  // 初始化 start
   const {
     buildPlatform,
     originPkgPath,
   } = getAdapterConfig()
-  // 初始化 end
 
-  Editor.log(`开始构建项目，导出${buildPlatform}包`)
+  console.info('==================== 开始构建项目 ====================');
+  console.info(`【构建平台】${buildPlatform}`);
 
   Editor.Ipc.sendToMain('builder:query-build-options', (err: any, options: TBuildOptions) => {
     const scenes = options.scenes || []

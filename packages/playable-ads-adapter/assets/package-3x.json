@@ -4,13 +4,13 @@
   "description": "i18n:playable-ads-adapter.description",
   "main": "./main.js",
   "editor": ">=3.3.0",
-  "author": "ppgee",
+  "author": "ppgee & yueby",
   "contributions": {
     "builder": "./main.js",
     "menu": [
       {
-        "path": "i18n:menu.extension/playable-adapter",
-        "label": "i18n:build",
+        "path": "i18n:menu.extension/",
+        "label": "i18n:playable-ads-adapter.build",
         "message": "adapter-build"
       }
     ],

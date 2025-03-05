@@ -1,12 +1,11 @@
+import { checkImgType, getAllFilesFormDir, getOriginPkgPath, getRCTinify, writeToPath } from "@/utils";
 import Axios from 'axios';
 import { readFileSync } from 'fs';
-import { checkImgType, getAllFilesFormDir, getOriginPkgPath, getRCTinify, writeToPath } from "@/utils"
 
 // Upload file remotely
 const postFileToRemote = (filePath: string, data: Buffer): Promise<void> => {
   const { tinifyApiKey } = getRCTinify()
   return new Promise((resolve, reject) => {
-    console.log('【Preparing to upload image to TinyPng】 ', filePath)
     Axios.request({
       method: 'post',
       url: 'https://api.tinify.com/shrink',
@@ -16,14 +15,17 @@ const postFileToRemote = (filePath: string, data: Buffer): Promise<void> => {
       },
       data
     }).then((response) => {
-      console.log('【Preparing to download compressed image】 ', filePath)
       Axios.request({
         method: 'get',
         url: response.data.output.url,
         responseType: 'arraybuffer'
       }).then((fileResponse) => {
-        writeToPath(filePath, Buffer.from(fileResponse.data))
-        console.log('【Image compression completed】 ', filePath)
+        const originalSize = data.length;
+        const compressedSize = fileResponse.data.length;
+        const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
+        
+        writeToPath(filePath, new Uint8Array(fileResponse.data))
+        console.info(`[压缩] ${filePath} (${(originalSize/1024).toFixed(1)}kb -> ${(compressedSize/1024).toFixed(1)}kb, -${ratio}%)`)
         resolve()
       }).catch((fileErr) => {
         reject(fileErr)
@@ -40,7 +42,7 @@ export const execTinify = async (): Promise<{ success: boolean, msg: string }> =
   if (!tinify) {
     return {
       success: false,
-      msg: 'Compression not enabled'
+      msg: '未开启图片压缩'
     }
   }
 
@@ -48,7 +50,7 @@ export const execTinify = async (): Promise<{ success: boolean, msg: string }> =
   if (!tinifyApiKey) {
     return {
       success: false,
-      msg: 'You need to provide your API key, get it from: https://tinify.cn/developers'
+      msg: '请提供 API key, 从这里获取: https://tinify.cn/developers'
     }
   }
 
@@ -57,6 +59,8 @@ export const execTinify = async (): Promise<{ success: boolean, msg: string }> =
   const files = getAllFilesFormDir(originPkgPath).filter((filePath) => {
     return checkImgType(filePath)
   })
+
+  console.info(`[压缩] 共发现 ${files.length} 个图片文件`);
 
   let promiseList: Promise<void>[] = []
   for (let index = 0; index < files.length; index++) {
@@ -67,6 +71,6 @@ export const execTinify = async (): Promise<{ success: boolean, msg: string }> =
 
   return {
     success: true,
-    msg: 'Compression completed'
+    msg: '压缩完成'
   }
 }

@@ -4,19 +4,19 @@ window.__adapter_init = function () {
   function base64ToBlob(base64, type) {
     let oriResBase64 = base64;
     let base64Arr = oriResBase64.split(',');
-    let mime = type
+    let mime = type;
 
     // mime-type start
     if (base64Arr.length === 2) {
-      let mimeStr = base64Arr.shift()
-      let regExp = new RegExp(':(.*?);')
+      let mimeStr = base64Arr.shift();
+      let regExp = new RegExp(':(.*?);');
       let array = mimeStr.match(regExp);
       mime = (array && array.length > 1 ? array[1] : type) || type;
     }
     // mime-type end
 
     // arraybuffer start
-    let base64Str = base64Arr.shift()
+    let base64Str = base64Arr.shift();
     let bytes = window.atob(base64Str);
     let arrBuf = new ArrayBuffer(bytes.length);
     // arraybuffer end
@@ -43,12 +43,12 @@ window.__adapter_init = function () {
   class AdapterFetch {
     constructor() {
       this.response = null, this.status = 200, this.responseType = "", this.onload = function () {
-        console.log("onload")
-      }
+        console.log("onload");
+      };
     }
     open(e, t) {
       const n = __adapter_get_resource(t);
-      n ? this.response = n : console.log("res", n, t)
+      n ? this.response = n : console.log("res", n, t);
     }
     send() {
       switch (this.responseType) {
@@ -64,14 +64,14 @@ window.__adapter_init = function () {
         default:
           this.response = this.response;
       }
-      this.onload()
+      this.onload();
     }
   }
 
   function __adapter_eval(name) {
     if (!window.__adapter_js__[name]) {
-      console.warn('window.__adapter_js__ is not found ', name)
-      return
+      console.warn('window.__adapter_js__ is not found ', name);
+      return;
     }
     eval(window.__adapter_js__[name]);
     delete window.__adapter_js__[name];
@@ -93,12 +93,12 @@ window.__adapter_init = function () {
         baseUrl = baseUrl.slice(0, lastSepIndex + 1);
     }
 
-    return baseUrl || ''
+    return baseUrl || '';
   }
 
   function __adapter_get_res_path(url, target) {
     if (target[url]) {
-      return url
+      return url;
     }
 
     for (let key in target) {
@@ -115,8 +115,8 @@ window.__adapter_init = function () {
   }
 
   function __adapter_get_imports() {
-    const json = JSON.parse(__adapter_get_resource("src/import-map.json"))
-    return json.imports
+    const json = JSON.parse(__adapter_get_resource("src/import-map.json"));
+    return json.imports;
   }
 
   function __adapter_get_script(url) {
@@ -137,9 +137,9 @@ window.__adapter_init = function () {
   }
 
   function __adapter_init_http() {
-    window.adapterFetch = AdapterFetch
+    window.adapterFetch = AdapterFetch;
 
-    const _fetch = window.fetch
+    const _fetch = window.fetch;
     window.fetch = function (url, options) {
       const resource = __adapter_get_resource(url);
       if (resource) {
@@ -153,11 +153,11 @@ window.__adapter_init = function () {
               // 根据不同的资源url返回不同的content-type，json、css、wasm
               if (key === 'content-type') {
                 if (url.indexOf('.json') !== -1) {
-                  return 'application/json'
+                  return 'application/json';
                 } else if (url.indexOf('.css') !== -1) {
-                  return 'text/css'
+                  return 'text/css';
                 } else if (url.indexOf('.wasm') !== -1) {
-                  return 'application/wasm'
+                  return 'application/wasm';
                 }
               }
               return 'application/javascript';
@@ -176,25 +176,35 @@ window.__adapter_init = function () {
           arrayBuffer: function () {
             return Promise.resolve(base64toArrayBuffer(resource));
           }
-        }
+        };
         return Promise.resolve(response);
       }
-      return _fetch(url, options)
-    }
+      return _fetch(url, options);
+    };
   }
 
   function __adapter_init_js() {
-    const _createScript = System.__proto__.createScript
+    const _createScript = System.__proto__.createScript;
     System.__proto__.createScript = function (url) {
-      let baseUrl = url.replace(__adapter_get_base_url(), '')
-      let res = __adapter_get_script(baseUrl)
+      let res = __adapter_get_script(url.replace(__adapter_get_base_url(), ''));
+
       if (!res) {
-        console.error(`${url} 找不到资源`)
-        return _createScript.call(this, url)
+        console.error(`${url} 找不到资源`);
+        return _createScript.call(this, url);
       }
 
-      const blob = new Blob([res], { type: 'text/javascript' });
-      return _createScript.call(this, URL.createObjectURL(blob))
+      // 创建新的 script 元素
+      const script = document.createElement('script');
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.text = res;
+
+      // 模拟加载完成事件
+      setTimeout(() => {
+        script.dispatchEvent(new Event('load'));
+      });
+
+      return script;
     };
   }
 
@@ -204,9 +214,9 @@ window.__adapter_init = function () {
     }
     window.__adapter_cc_initialized__ = true;
     function loadScript(url, options, onComplete) {
-      let scriptStr = __adapter_get_resource(url)
+      let scriptStr = __adapter_get_resource(url);
       if (!scriptStr) {
-        console.error(url + ' isn\'t load')
+        console.error(url + ' isn\'t load');
       }
       eval(scriptStr);
       onComplete && onComplete(null);
@@ -217,7 +227,7 @@ window.__adapter_init = function () {
       onComplete(null, data);
     }
     function loadBundle(url, options, onComplete) {
-      const REGEX = new RegExp('^(?:\w+:\/\/|\.+\/).+')
+      const REGEX = new RegExp('^(?:\w+:\/\/|\.+\/).+');
       let bundleName = cc.path.basename(url);
       if (!REGEX.test(url)) {
         url = 'assets/' + bundleName;
@@ -249,7 +259,7 @@ window.__adapter_init = function () {
       });
     }
     function loadFont(url, options, onComplete) {
-      const fontFamilyName = url.split('/').pop().split('.')[0]
+      const fontFamilyName = url.split('/').pop().split('.')[0];
       const data = __adapter_get_resource(url);
       if (data == null) {
         onComplete();
@@ -263,13 +273,13 @@ window.__adapter_init = function () {
       }, function () {
         console.error('url(' + url + ') load fail');
         onComplete(null, fontFamilyName);
-      })
+      });
     }
     // Image
     function loadImage(url, options, onComplete) {
       const data = __adapter_get_resource(url);
       if (!data) {
-        console.error(url + ' isn\'t load')
+        console.error(url + ' isn\'t load');
       }
 
       let img = new Image();
@@ -277,13 +287,13 @@ window.__adapter_init = function () {
         img.removeEventListener('load', loadCallback);
         img.removeEventListener('error', errorCallback);
         onComplete && onComplete(null, img);
-      }
+      };
 
       const errorCallback = function () {
         img.removeEventListener('load', loadCallback);
         img.removeEventListener('error', errorCallback);
         onComplete && onComplete(new Error(cc.debug.getError(4930, url)));
-      }
+      };
 
       img.addEventListener('load', loadCallback);
       img.addEventListener('error', errorCallback);
@@ -296,11 +306,11 @@ window.__adapter_init = function () {
       var source = document.createElement('source');
       video.appendChild(source);
 
-      let res = __adapter_get_resource(url)
+      let res = __adapter_get_resource(url);
       if (res) {
         res = base64ToBlob(res);
         res = URL.createObjectURL(res);
-        source.src = res
+        source.src = res;
 
         onComplete(null, video);
       } else {
@@ -387,11 +397,11 @@ window.__adapter_init = function () {
 
       'bundle': loadBundle,
       'default': loadText,
-    }
-    cc.assetManager.downloader.downloadScript = loadScript
+    };
+    cc.assetManager.downloader.downloadScript = loadScript;
     Object.keys(downloaderList).forEach((extname) => {
       cc.assetManager.downloader.register(extname, downloaderList[extname]);
-    })
+    });
   }
 
   function __adapter_init_plugins() {
@@ -400,9 +410,9 @@ window.__adapter_init = function () {
     }
 
     window.__adapter_plugins__.forEach((scriptPath) => {
-      const fileName = 'src/' + scriptPath
-      __adapter_eval(fileName)
-    })
+      const fileName = 'src/' + scriptPath;
+      __adapter_eval(fileName);
+    });
   }
 
   function __adapter_get_path(key) {
@@ -421,18 +431,23 @@ window.__adapter_init = function () {
 
   __adapter_init_js();
 
-  let prepareLoad = Promise.resolve()
-  const importsKeys = Object.keys(__adapter_get_imports())
+  let prepareLoad = Promise.resolve();
+  const importsKeys = Object.keys(__adapter_get_imports());
   for (let index = importsKeys.length - 1; index >= 0; index--) {
     const key = importsKeys[index];
-    prepareLoad = prepareLoad.then(() => System.import(key))
+    prepareLoad = prepareLoad.then(() => System.import(key));
   }
 
   prepareLoad.then(() => {
-    __adapter_init_cc()
-    __adapter_init_plugins()
-    System.import('./' + __adapter_get_path('index')).catch((err) => {
+    __adapter_init_cc();
+    __adapter_init_plugins();
+    try {
+      System.import('./' + __adapter_get_path('index')).catch((err) => {
+        console.error(err);
+      });
+    } catch (err) {
       console.error(err);
-    })
-  })
+      console.error("System.import('./' + __adapter_get_path('index'))");
+    }
+  });
 };
