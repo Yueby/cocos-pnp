@@ -7,37 +7,48 @@ const iosTag: string = '<ios>';
 const androidTag: string = '<android>';
 
 export const readAdapterRCFile = (): TAdapterRC | null => {
-	const projectRootPath = Editor.Project.path;
-	const adapterRCJsonPath = `${projectRootPath}${ADAPTER_RC_PATH}`;
-	const legacyAdapterRCPath = `${projectRootPath}/.adapterrc`;
-	
-	let configPath = '';
-	if (existsSync(adapterRCJsonPath)) {
-		configPath = adapterRCJsonPath;
-	} else if (existsSync(legacyAdapterRCPath)) {
-		configPath = legacyAdapterRCPath;
-	}
-	
-	if (configPath) {
-		let config = <TAdapterRC>JSON.parse(readToPath(configPath));
-
+	try {
+		const projectRootPath = Editor.Project.path;
+		const adapterRCJsonPath = `${projectRootPath}${ADAPTER_RC_PATH}`;
+		const legacyAdapterRCPath = `${projectRootPath}/.adapterrc`;
+		
+		let configPath = '';
+		if (existsSync(adapterRCJsonPath)) {
+			configPath = adapterRCJsonPath;
+		} else if (existsSync(legacyAdapterRCPath)) {
+			configPath = legacyAdapterRCPath;
+		}
+		
+		if (!configPath) return null;
+		
+		const fileContent = readToPath(configPath);
+		if (!fileContent) return null;
+		
+		let config = <TAdapterRC>JSON.parse(fileContent);
+		
+		// 处理注入选项
 		if (config.injectOptions) {
 			for (const channel in config.injectOptions) {
 				if (config.injectOptions.hasOwnProperty(channel)) {
 					const typedChannel = channel as keyof typeof config.injectOptions;
-					config.injectOptions[typedChannel].body = modifyBody(config.injectOptions[typedChannel].body, config);
+					const channelConfig = config.injectOptions[typedChannel];
+					if (channelConfig && channelConfig.body) {
+						config.injectOptions[typedChannel].body = modifyBody(channelConfig.body, config);
+					}
 				}
 			}
 		}
 		return config;
+	} catch (error) {
+		console.error('读取配置文件失败:', error);
+		return null;
 	}
-
-	return null;
 };
 
 const modifyBody = (body: string, config: TAdapterRC): string => {
-	const { iosUrl, androidUrl } = config || {};
-	return body.replaceAll(iosTag, iosUrl!).replaceAll(androidTag, androidUrl!);
+	if (!body) return '';
+	const { iosUrl = '', androidUrl = '' } = config || {};
+	return body.replaceAll(iosTag, iosUrl).replaceAll(androidTag, androidUrl);
 };
 
 export const getAdapterConfig = () => {

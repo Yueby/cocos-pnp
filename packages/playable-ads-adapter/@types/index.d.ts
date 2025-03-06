@@ -4,32 +4,28 @@
 
 /// <reference path="@cocos/creator-types/editor/packages/builder/@types/public/global.d.ts"/>
 export * from '@cocos/creator-types/editor/packages/builder/@types/public';
+export { Checkbox, Input, Select };
 
-import { IBuildTaskOption, IPanelThis } from '@cocos/creator-types/editor/packages/builder/@types/public';
-import { Checkbox, Input, Select } from '@editor/creator-ui-kit/dist/renderer';
-import { TAdapterRC } from "playable-adapter-core";
+	import { Checkbox, Input, Select } from '@editor/creator-ui-kit/dist/renderer';
 
 const PACKAGE_NAME = 'playable-ads-adapter';
-export interface ITaskOptions extends IBuildTaskOption {
-	packages: {
-		[PACKAGE_NAME]: TAdapterRC;
-	};
-}
 
-export interface ICustomPanelThis extends IPanelThis {
-	options: ITaskOption;
-	errorMap: any;
-	pkgName: string;
-	$: {
-		root: HTMLElement;
-		fileName: Editor.UI.HTMLCustomElement<Input>;
-		titleName: Editor.UI.HTMLCustomElement<Input>;
-		iosUrl: Editor.UI.HTMLCustomElement<Input>;
-		androidUrl: Editor.UI.HTMLCustomElement<Input>;
-		buildPlatform: Editor.UI.HTMLCustomElement<Input>;
-		orientation: Editor.UI.HTMLCustomElement<Select>;
-		tinify: Editor.UI.HTMLCustomElement<Checkbox>;
-		tinifyApiKey: Editor.UI.HTMLCustomElement<Input>;
-		[key: string]: Editor.UI.HTMLCustomElement | HTMLElement;
-	};
-}
+export type HTMLCustomElement<T extends {} = Record<string, any>> = HTMLElement & T;
+
+export type TSelector<K extends string = string> = {
+	// 允许指定类型的键（可选的）
+	[key in K]?: string;
+} & {
+	// 同时允许任意字符串键，提供更大的灵活性
+	[key: string]: string;
+};
+
+export type TPanelSelector<K extends string = string> = TSelector<K> & {
+	root: string;
+};
+
+// 定义面板元素类型，使其更具体
+export type TPanelElements = {
+	root: HTMLCustomElement;
+	[key: string]: HTMLCustomElement;
+};

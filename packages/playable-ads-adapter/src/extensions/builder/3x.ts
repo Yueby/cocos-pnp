@@ -7,10 +7,9 @@ import { exec3xAdapter } from 'playable-adapter-core';
 import { IBuildTaskOption } from '~types/packages/builder/@types';
 import workPath from '../worker/3x?worker';
 
-const setupWorker = (params: { buildFolderPath: string; adapterBuildConfig: TAdapterRC; }, successCb: Function, failCb: Function) => {
+const setupWorker = (params: { buildFolderPath: string; adapterBuildConfig: TAdapterRC }, successCb: Function, failCb: Function) => {
 	const { Worker } = require('worker_threads');
 
-	console.log('支持Worker，将开启子线程适配');
 	const worker = new Worker(workPath, {
 		workerData: params
 	});
@@ -83,6 +82,7 @@ export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
 		};
 
 		try {
+			console.log('尝试使用Worker适配');
 			setupWorker(params, handleExportFinished, handleExportError);
 		} catch (error) {
 			console.log('不支持Worker，将开启主线程适配');

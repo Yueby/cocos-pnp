@@ -22,7 +22,7 @@ export default {
     main: `src/main${builderVersion}.ts`,
     ...(is2xBuilder ? {} : {
       hooks: `src/hooks.ts`,
-      panel: 'src/panel.ts'
+      panel: 'src/panels/default/panel.ts'
     })
   },
   output: {

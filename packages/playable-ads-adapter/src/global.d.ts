@@ -443,18 +443,20 @@ type TChannelRC = {
 
 type TAdapterRC = {
 	fileName?: string;
-	titleName?: string;
+	title?: string;
 	iosUrl?: string;
 	androidUrl?: string;
 	buildPlatform?: Platform;
 	skipBuild?: boolean;
 	orientation?: TWebOrientations;
+	enableSplash?: boolean;
 	exportChannels?: TChannel[];
 	injectOptions?: {
 		[key in TChannel]: TChannelRC;
 	};
 	tinify?: boolean;
 	tinifyApiKey?: string;
+	isZip?: boolean;
 };
 
 type TResourceData = { [key: string]: string };

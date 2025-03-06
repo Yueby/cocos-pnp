@@ -11,6 +11,11 @@ export const getRealPath = (pathStr: string) => {
 };
 
 export const readToPath = (filepath: string, encoding?: BufferEncoding) => {
-  const fileBuffer = readFileSync(filepath);
-  return fileBuffer.toString(encoding);
+  try {
+    const fileBuffer = readFileSync(filepath);
+    return fileBuffer.toString(encoding);
+  } catch (error) {
+    console.error(`读取文件失败 (${filepath}):`, error);
+    return '';
+  }
 };

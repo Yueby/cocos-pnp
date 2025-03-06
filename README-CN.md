@@ -6,6 +6,7 @@ Cocos 广告试玩多渠道导出插件
 
 为了适配自己的工作流，作出了以下修改：
 
+-   构建发布面板内 UI
 -   自定义导出文件名
 -   自定义 HTML 标题名
 -   自定义 IOS 和 Android 平台的 URL，并通过\<ios>和\<android>标签对 injectOptions 属性中 Channel 的 Body 字符串进行替换
