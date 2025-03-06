@@ -1,5 +1,7 @@
 'use strict';
 
+import { shell } from 'electron';
+import { existsSync, promises } from 'fs';
 import { HTMLCustomElement } from '../../../@types';
 import { ADAPTER_RC_PATH } from '../../extensions/constants';
 import { readAdapterRCFile } from '../../extensions/utils/file-system/adapterrc';
@@ -18,9 +20,6 @@ const CONFIG = {
 export const style = STYLE;
 export const template = TEMPLATE;
 export const $ = SELECTORS;
-
-type $key = keyof typeof SELECTORS;
-const $keys: $key[] = Object.keys(SELECTORS) as $key[];
 
 export async function ready(options: ITaskOptions) {
 	// @ts-ignore
@@ -73,7 +72,6 @@ export async function update(options: ITaskOptions, key: string) {
 }
 
 async function saveConfigToFile(options: ITaskOptions) {
-	const fs = require('fs');
 	const projectPath = Editor.Project.path;
 	const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
@@ -81,7 +79,7 @@ async function saveConfigToFile(options: ITaskOptions) {
 	const config = options.packages[PACKAGE_NAME as keyof typeof options.packages];
 	const cleanConfig = removeEmptyValues(config);
 
-	await fs.promises.writeFile(configPath, JSON.stringify(cleanConfig, null, 2));
+	await promises.writeFile(configPath, JSON.stringify(cleanConfig, null, 2));
 	console.log(`保存配置到 ${configPath}`);
 }
 
@@ -368,11 +366,10 @@ function getDialogConfig(operation: 'import' | 'export') {
 }
 
 async function processFileOperation(operation: 'import' | 'export', filePath: string) {
-	const fs = require('fs');
 	if (operation === 'import') {
-		await handleImport(fs, filePath);
+		await handleImport(filePath);
 	} else {
-		await handleExport(fs, filePath);
+		await handleExport(filePath);
 	}
 }
 
@@ -393,10 +390,9 @@ async function applyConfig(config: TAdapterRC, saveToFile: boolean = true) {
 	// 保存配置到文件
 	if (saveToFile) {
 		try {
-			const fs = require('fs');
 			const projectPath = Editor.Project.path;
 			const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
-			await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2));
+			await promises.writeFile(configPath, JSON.stringify(config, null, 2));
 			console.log(`应用配置并保存到 ${configPath}`);
 		} catch (err: any) {
 			console.error(`保存配置文件到 ${Editor.Project.path}${ADAPTER_RC_PATH} 失败:`, err.message);
@@ -412,33 +408,33 @@ async function applyConfig(config: TAdapterRC, saveToFile: boolean = true) {
 	return true;
 }
 
-async function handleImport(fs: any, filePath: string) {
+async function handleImport(filePath: string) {
 	try {
 		// 获取项目路径和目标配置文件路径
 		const projectPath = Editor.Project.path;
 		const targetPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
 		// 检查源文件是否存在
-		if (!fs.existsSync(filePath)) {
+		if (!existsSync(filePath)) {
 			console.error(`源文件不存在: ${filePath}`);
 			return;
 		}
 
 		// 读取源文件内容，确保它是有效的 JSON
-		const content = JSON.parse(await fs.promises.readFile(filePath, 'utf8'));
+		const content = JSON.parse(await promises.readFile(filePath, 'utf8'));
 		if (!content) {
 			console.error(`源文件内容无效: ${filePath}`);
 			return;
 		}
 
 		// 删除目标文件（如果存在）
-		if (fs.existsSync(targetPath)) {
-			await fs.promises.unlink(targetPath);
+		if (existsSync(targetPath)) {
+			await promises.unlink(targetPath);
 			console.log(`已删除现有配置文件: ${targetPath}`);
 		}
 
 		// 复制源文件到目标路径
-		await fs.promises.copyFile(filePath, targetPath);
+		await promises.copyFile(filePath, targetPath);
 		console.log(`已复制配置文件: ${filePath} -> ${targetPath}`);
 
 		// 应用配置，但不再保存到文件（因为已经复制了文件）
@@ -449,10 +445,10 @@ async function handleImport(fs: any, filePath: string) {
 	}
 }
 
-async function handleExport(fs: any, dirPath: string) {
+async function handleExport(dirPath: string) {
 	const config = getOptions();
 	const exportPath = `${dirPath}${ADAPTER_RC_PATH}`;
-	await fs.promises.writeFile(exportPath, JSON.stringify(config, null, 2));
+	await promises.writeFile(exportPath, JSON.stringify(config, null, 2));
 	console.log(`导出配置到 ${exportPath}`);
 }
 
@@ -492,13 +488,11 @@ function initCreatePanelButtons() {
  */
 async function handleOpenConfig() {
 	try {
-		const fs = require('fs');
-		const { shell } = require('electron');
 		const projectPath = Editor.Project.path;
 		const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
 		// 检查文件是否存在
-		if (fs.existsSync(configPath)) {
+		if (existsSync(configPath)) {
 			// 使用系统默认程序打开文件
 			await shell.openPath(configPath);
 			console.log(`使用系统默认程序打开配置文件: ${configPath}`);

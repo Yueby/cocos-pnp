@@ -96,6 +96,9 @@ importers:
       cheerio:
         specifier: 1.0.0-rc.12
         version: 1.0.0-rc.12
+      fs-extra:
+        specifier: ^11.3.0
+        version: 11.3.0
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -110,7 +113,7 @@ importers:
         version: link:../playable-adapter-core
     devDependencies:
       '@cocos/creator-types':
-        specifier: ^3.8.5
+        specifier: ^3.8.3
         version: 3.8.5
       '@rollup/plugin-alias':
         specifier: ^4.0.2
@@ -811,6 +814,10 @@ packages:
   fs-extra@10.1.0:
     resolution: {integrity: sha512-oRXApq54ETRj4eMiFzGnHWGy+zo5raudjuxN0b8H7s/RU2oW0Wvsx9O0ACRN/kRq9E8Vu/ReskGB5o3ji+FzHQ==}
     engines: {node: '>=12'}
+
+  fs-extra@11.3.0:
+    resolution: {integrity: sha512-Z4XaCL6dUDHfP/jT25jJKMmtxvuwbkrD1vNSMFlo9lNLY2c5FHYSQgHPRZUjAB26TpDEoW9HCOgplrdbaPV/ew==}
+    engines: {node: '>=14.14'}
 
   fs-extra@8.1.0:
     resolution: {integrity: sha512-yhlQgA6mnOJUKOsRUFsgJdQCvkKhcz8tlZG5HBQfReYZy46OwLcY+Zia0mtdHsOo9y/hP+CxMN0TU9QxoOtG4g==}
@@ -2374,6 +2381,12 @@ snapshots:
       mime-types: 2.1.35
 
   fs-extra@10.1.0:
+    dependencies:
+      graceful-fs: 4.2.10
+      jsonfile: 6.1.0
+      universalify: 2.0.0
+
+  fs-extra@11.3.0:
     dependencies:
       graceful-fs: 4.2.10
       jsonfile: 6.1.0
