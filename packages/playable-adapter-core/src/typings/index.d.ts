@@ -52,6 +52,7 @@ export type TBuilderOptions = {
 	channel: TChannel;
 	transformHTML?: ($: CheerioAPI) => Promise<void>;
 	transform?: (destPath: string) => Promise<void>;
+	fixInitScript?: boolean;
 } & Pick<TChannelPkgOptions, 'resMapper' | 'compDiff'>;
 
 export type TExportType = 'zip' | 'dirZip';
@@ -59,6 +60,7 @@ export type TExportType = 'zip' | 'dirZip';
 export type TZipFromSingleFileOptions = TBuilderOptions & {
 	transformScript?: (scriptNode: Cheerio<Element>) => Promise<void>;
 	exportType?: TExportType;
+	
 };
 
 export type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity';
@@ -72,6 +74,7 @@ export type TChannelRC = {
 export type TAdapterRC = {
 	fileName?: string;
 	title?: string;
+	lang?: string;
 	iosUrl?: string;
 	androidUrl?: string;
 	buildPlatform?: TPlatform;

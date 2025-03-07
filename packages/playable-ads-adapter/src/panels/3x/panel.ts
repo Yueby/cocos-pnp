@@ -2,20 +2,15 @@
 
 import { shell } from 'electron';
 import { existsSync, promises } from 'fs';
-import { HTMLCustomElement } from '../../../@types';
+
+import { buildState } from '../../extensions/builder/3x';
 import { ADAPTER_RC_PATH } from '../../extensions/constants';
-import { readAdapterRCFile } from '../../extensions/utils/file-system/adapterrc';
-import { ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCustomPanelElements } from '../types';
-import { CHANNEL_OPTIONS, EVENT_TYPES, IDS, SELECTORS, STYLE, TEMPLATE } from './config';
+import { readAdapterRCFileForPanel } from '../../extensions/utils/file-system/adapterrc';
+import { CHANNEL_OPTIONS, CONFIG, EVENT_TYPES, IDS, SELECTORS, STYLE, TEMPLATE } from './config';
+import { HTMLCustomElement, ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCustomPanelElements } from './types';
 
 let panel: ICustomPanelThis;
-
-// 配置常量
-const CONFIG = {
-	DEFAULT_BUILD_PLATFORM: 'web-mobile',
-	DEFAULT_ORIENTATION: 'auto',
-	INJECT_FIELDS: ['head', 'body', 'sdkScript'] as const
-} as const;
+let unsubscribeBuildState: (() => void) | null = null;
 
 export const style = STYLE;
 export const template = TEMPLATE;
@@ -26,23 +21,32 @@ export async function ready(options: ITaskOptions) {
 	panel = this as ICustomPanelThis;
 	panel.options = options;
 
-	// 初始化面板元素，确保 panel.$ 中的所有元素都不为空
-	// 这样在后续代码中可以安全地访问这些元素，不需要进行空检查
-	// initPanelElements<ICustomPanelThis>(panel, SELECTORS);
+	// 注册构建状态监听器
+	unsubscribeBuildState = buildState.subscribe(({ building, error }) => {
+		const mask = panel.$[IDS.BUILDING_MASK];
+		if (building) {
+			mask.classList.add('active');
+			console.log('构建中...');
+		} else {
+			mask.classList.remove('active');
+			if (error) {
+				console.error('构建失败:', error);
+			}
+		}
+	});
 
 	// 读取配置文件
-	const config = readAdapterRCFile();
+	const config = readAdapterRCFileForPanel();
 	if (config) {
 		// 直接使用读取到的配置
 		showConfigPanel();
-		initImportExport(); // 初始化配置面板按钮
+		initConfigPanelButtons(); // 初始化配置面板按钮
 		setOptions(config);
 
 		init();
 	} else {
 		hideConfigPanel();
 		initCreatePanelButtons(); // 初始化创建面板按钮
-		initCreateButton();
 	}
 }
 
@@ -57,7 +61,7 @@ export async function update(options: ITaskOptions, key: string) {
 		await saveConfigToFile(options);
 
 		// 重新读取配置文件并刷新面板
-		const newConfig = readAdapterRCFile();
+		const newConfig = readAdapterRCFileForPanel();
 		if (newConfig) {
 			await applyConfig(newConfig, false);
 		}
@@ -136,10 +140,15 @@ export function close() {
 	}
 
 	try {
+		// 清理构建状态监听器
+		if (unsubscribeBuildState) {
+			unsubscribeBuildState();
+			unsubscribeBuildState = null;
+		}
+
 		const root = panel.$.root;
 		if (root) {
 			root.remove();
-			// console.log('已移除面板根元素，清理了所有事件监听器');
 		}
 
 		// 清空面板的 $ 对象
@@ -191,7 +200,7 @@ function initBaseConfig() {
 	const config = getOptions();
 
 	// 基础配置字段
-	const baseFields = ['fileName', 'title', 'iosUrl', 'androidUrl', 'buildPlatform', 'tinifyApiKey'] as const;
+	const baseFields = ['fileName', 'lang', 'title', 'iosUrl', 'androidUrl', 'buildPlatform', 'tinifyApiKey'] as const;
 	baseFields.forEach((field) => {
 		const input: HTMLCustomElement = panel.$[field];
 		// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查 input 是否存在
@@ -297,28 +306,62 @@ function updateInjectOptions() {
 	});
 }
 
-// 创建配置按钮的事件处理函数
-const handleCreateConfigClick = async () => {
-	const defaultConfig = {
+/**
+ * 创建默认的注入选项
+ */
+function createDefaultInjectOptions(): Record<TChannel, TChannelRC> {
+	return CHANNEL_OPTIONS.reduce((acc, channel) => {
+		acc[channel] = {
+			head: '',
+			body: '',
+			sdkScript: ''
+		};
+		return acc;
+	}, {} as Record<TChannel, TChannelRC>);
+}
+
+/**
+ * 创建默认配置
+ */
+function createDefaultConfig(): TAdapterRC {
+	return {
 		buildPlatform: CONFIG.DEFAULT_BUILD_PLATFORM,
 		orientation: CONFIG.DEFAULT_ORIENTATION,
 		exportChannels: [],
-		injectOptions: CHANNEL_OPTIONS.reduce((acc, channel) => {
-			acc[channel] = { head: '', body: '', sdkScript: '' };
-			return acc;
-		}, {} as Record<TChannel, TChannelRC>),
+		injectOptions: createDefaultInjectOptions(),
+		fileName: '',
+		lang: '',
+		title: '',
+		iosUrl: '',
+		androidUrl: '',
 		tinify: false,
+		tinifyApiKey: '',
 		enableSplash: false,
-		skipBuild: false
+		skipBuild: false,
+		isZip: false
 	};
-
-	// 应用默认配置
-	await applyConfig(defaultConfig);
-};
-
-function initCreateButton() {
-	panel.$[IDS.CREATE_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleCreateConfigClick);
 }
+
+// 修改创建配置按钮的处理函数
+const handleCreateConfigClick = async () => {
+	try {
+		const defaultConfig = createDefaultConfig();
+		const projectPath = Editor.Project.path;
+		const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
+
+		// 写入默认配置
+		await promises.writeFile(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
+		
+		// 重新读取并应用配置（不保存文件）
+		const newConfig = readAdapterRCFileForPanel();
+		if (newConfig) {
+			await applyConfig(newConfig, false);
+			console.log('成功创建并应用默认配置');
+		}
+	} catch (err: any) {
+		console.error('创建配置文件失败:', err.message);
+	}
+};
 
 function showConfigPanel() {
 	// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查元素是否存在
@@ -382,66 +425,66 @@ async function applyConfig(config: TAdapterRC, saveToFile: boolean = true) {
 	// 更新配置
 	setOptions(config);
 
-	// 逐个字段发送更新事件
-	Object.entries(config).forEach(([key, value]) => {
-		panel.dispatch('update', `packages.${PACKAGE_NAME}.${key}`, value);
-	});
+	// 更新 UI
+	showConfigPanel();
+	initConfigPanelButtons();
+	init();
 
-	// 保存配置到文件
+	// 如果需要，保存到文件
 	if (saveToFile) {
 		try {
 			const projectPath = Editor.Project.path;
 			const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
 			await promises.writeFile(configPath, JSON.stringify(config, null, 2));
-			console.log(`应用配置并保存到 ${configPath}`);
+			console.log(`配置已保存到 ${configPath}`);
 		} catch (err: any) {
-			console.error(`保存配置文件到 ${Editor.Project.path}${ADAPTER_RC_PATH} 失败:`, err.message);
+			console.error(`保存配置文件失败: ${err.message}`);
 			return false;
 		}
 	}
-
-	// 更新 UI
-	showConfigPanel();
-	initImportExport(); // 初始化配置面板按钮
-	init(); // 初始化所有控件
 
 	return true;
 }
 
 async function handleImport(filePath: string) {
 	try {
-		// 获取项目路径和目标配置文件路径
-		const projectPath = Editor.Project.path;
-		const targetPath = `${projectPath}${ADAPTER_RC_PATH}`;
-
 		// 检查源文件是否存在
 		if (!existsSync(filePath)) {
 			console.error(`源文件不存在: ${filePath}`);
 			return;
 		}
 
-		// 读取源文件内容，确保它是有效的 JSON
-		const content = JSON.parse(await promises.readFile(filePath, 'utf8'));
-		if (!content) {
-			console.error(`源文件内容无效: ${filePath}`);
+		// 读取源文件内容并验证
+		const content = await promises.readFile(filePath, 'utf8');
+		let config: any;
+		
+		try {
+			config = JSON.parse(content);
+		} catch (err) {
+			console.error('配置文件格式无效，请确保是有效的 JSON 格式');
 			return;
 		}
 
-		// 删除目标文件（如果存在）
+		// 获取目标路径
+		const projectPath = Editor.Project.path;
+		const targetPath = `${projectPath}${ADAPTER_RC_PATH}`;
+
+		// 删除现有配置文件（如果存在）
 		if (existsSync(targetPath)) {
 			await promises.unlink(targetPath);
-			console.log(`已删除现有配置文件: ${targetPath}`);
 		}
 
-		// 复制源文件到目标路径
+		// 直接复制文件
 		await promises.copyFile(filePath, targetPath);
-		console.log(`已复制配置文件: ${filePath} -> ${targetPath}`);
 
-		// 应用配置，但不再保存到文件（因为已经复制了文件）
-		await applyConfig(content, false);
-		console.log(`从 ${filePath} 导入配置并应用`);
+		// 重新读取并应用配置（不保存文件）
+		const newConfig = readAdapterRCFileForPanel();
+		if (newConfig) {
+			await applyConfig(newConfig, false);
+			console.log(`从 ${filePath} 导入配置并应用成功`);
+		}
 	} catch (err: any) {
-		console.error(`从 ${filePath} 导入配置失败:`, err.message);
+		console.error(`导入配置失败: ${err.message}`);
 	}
 }
 
@@ -457,13 +500,14 @@ const handleOpenConfigClick = () => handleOpenConfig();
 const handleImportClick = () => handleFileOperation('import');
 const handleExportClick = () => handleFileOperation('export');
 const handleImportCreateClick = () => handleFileOperation('import');
-
-function initImportExport() {
+const handleBuildClick = () => handleBuild();
+function initConfigPanelButtons() {
 	// 由于 initPanelElements 已确保所有元素都不为空，可以直接添加事件监听器
 	// 配置面板上的按钮
 	panel.$[IDS.OPEN_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleOpenConfigClick);
 	panel.$[IDS.IMPORT_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleImportClick);
 	panel.$[IDS.EXPORT_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleExportClick);
+	panel.$[IDS.BUILD].addEventListener(EVENT_TYPES.CLICK, handleBuildClick);
 }
 
 /**
@@ -473,14 +517,21 @@ function initCreatePanelButtons() {
 	// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查元素是否存在
 	// 创建面板上的导入配置按钮
 	panel.$[IDS.IMPORT_CONFIG_CREATE].addEventListener(EVENT_TYPES.CLICK, handleImportCreateClick);
+	panel.$[IDS.CREATE_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleCreateConfigClick);
 
 	// 确保配置面板按钮不可见
 
 	getStyle(IDS.CONFIG_BUTTONS).display = 'none';
 
 	// 确保创建面板按钮可见
-
 	getStyle(IDS.CREATE_BUTTONS).display = '';
+}
+
+function handleBuild() {
+	if (buildState.building) {
+		return;
+	}
+	Editor.Message.send(PACKAGE_NAME, 'adapter-build');
 }
 
 /**

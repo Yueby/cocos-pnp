@@ -1,8 +1,14 @@
-import { TPanelSelector } from '../../../@types';
-import { TAdapterRCKeysExcluded } from '../types';
+import { TAdapterRCKeysExcluded, TPanelSelector } from './types';
 
 export const CHANNEL_OPTIONS: TChannel[] = ['AppLovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'Mintegral', 'Moloco', 'Pangle', 'Rubeex', 'Tiktok', 'Unity'];
 export const ORIENTATIONS: TWebOrientations[] = ['auto', 'portrait', 'landscape'];
+
+// 配置常量
+export const CONFIG = {
+	DEFAULT_BUILD_PLATFORM: 'web-mobile',
+	DEFAULT_ORIENTATION: 'auto',
+	INJECT_FIELDS: ['head', 'body', 'sdkScript'] as const
+} as const;
 
 export const IDS = {
 	CONFIG_BUTTONS: 'configButtons',
@@ -13,7 +19,9 @@ export const IDS = {
 	IMPORT_CONFIG: 'importConfig',
 	EXPORT_CONFIG: 'exportConfig',
 	IMPORT_CONFIG_CREATE: 'importConfigCreate',
-	CREATE_CONFIG: 'createConfig'
+	CREATE_CONFIG: 'createConfig',
+	BUILD: 'build',
+	BUILDING_MASK: 'buildingMask'
 } as const;
 
 // 事件类型
@@ -39,14 +47,48 @@ export const STYLE = `
     font-weight: bold;
     border-bottom: 1px solid var(--color-border);
 }
+
+.loading-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.loading-mask.active {
+    display: flex;
+}
+
+.loading-content {
+    text-align: center;
+    color: white;
+}
+
+.loading-text {
+    margin-top: 10px;
+    font-size: 14px;
+}
 `;
 
 export const TEMPLATE = `
 <div id="adapter-panel">
+    <div class="loading-mask" id="${IDS.BUILDING_MASK}">
+        <div class="loading-content">
+            <ui-loading></ui-loading>
+            <div class="loading-text">构建中...</div>
+        </div>
+    </div>
     <div id="${IDS.CONFIG_BUTTONS}" style="text-align: right; margin-bottom: 12px; display: none;">
         <ui-button id="${IDS.OPEN_CONFIG}">打开配置</ui-button>
         <ui-button id="${IDS.IMPORT_CONFIG}">导入配置</ui-button>
         <ui-button id="${IDS.EXPORT_CONFIG}">导出配置</ui-button>
+        <ui-button id="${IDS.BUILD}" type="primary">构建</ui-button>
     </div>
     <div id="${IDS.CREATE_BUTTONS}" style="text-align: right; margin-bottom: 12px;">
         <ui-button id="${IDS.IMPORT_CONFIG_CREATE}">导入配置</ui-button>
@@ -63,9 +105,10 @@ export const TEMPLATE = `
             <ui-label slot="label" value="文件名"></ui-label>
             <ui-input slot="content" id="fileName"></ui-input>
         </ui-prop>
+
         <ui-prop>
-            <ui-label slot="label" value="HTML标题"></ui-label>
-            <ui-input slot="content" id="title"></ui-input>
+            <ui-label slot="label" value="语言"></ui-label>
+            <ui-input slot="content" id="lang"></ui-input>
         </ui-prop>
         <ui-prop>
             <ui-label slot="label" value="iOS URL"></ui-label>
@@ -107,6 +150,16 @@ export const TEMPLATE = `
         </ui-prop>
 
         <div class="section-header">导出渠道配置</div>
+        <ui-section header="额外配置 (Facebook、Google)" expand>
+            <ui-prop>
+                <ui-label>
+                    需要将构建发布面板中的"原生代码打包模式"改成AmsJS或者将物理引擎改成其他的，Bullet和Wasm就会引发如"i.xxx is not a function"的错误
+                    <ui-link tooltip="查看" value="https://github.com/ppgee/cocos-pnp/issues/33">
+                        <ui-icon value="help"></ui-icon>
+                    </ui-link>
+                </ui-label>
+            </ui-prop>
+        </ui-section>
         <div id="channelContainer" class="channel-list">
             ${CHANNEL_OPTIONS.map(
 				(channel) => `
@@ -116,6 +169,7 @@ export const TEMPLATE = `
         </div>
 
         <div class="section-header">注入选项配置</div>
+        
         <div id="injectOptionsContainer">
             ${CHANNEL_OPTIONS.map(
 				(channel) => `
@@ -136,6 +190,10 @@ export const TEMPLATE = `
             `
 			).join('')}
         </div>
+        <ui-prop>
+            <ui-label slot="label" value="HTML标题"></ui-label>
+            <ui-input slot="content" id="title"></ui-input>
+        </ui-prop>
     </div>
 </div>
 `;
@@ -154,6 +212,7 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
 	enableSplash: '#enableSplash',
 	skipBuild: '#skipBuild',
 	isZip: '#isZip',
+	lang: '#lang',
 
 	// DOM_IDS 中的选择器
 	[IDS.CONFIG_BUTTONS]: `#${IDS.CONFIG_BUTTONS}`,
@@ -165,6 +224,8 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
 	[IDS.EXPORT_CONFIG]: `#${IDS.EXPORT_CONFIG}`,
 	[IDS.IMPORT_CONFIG_CREATE]: `#${IDS.IMPORT_CONFIG_CREATE}`,
 	[IDS.CREATE_CONFIG]: `#${IDS.CREATE_CONFIG}`,
+	[IDS.BUILD]: `#${IDS.BUILD}`,
+	[IDS.BUILDING_MASK]: `#${IDS.BUILDING_MASK}`,
 
 	// 渠道相关选择器
 	...CHANNEL_OPTIONS.reduce(

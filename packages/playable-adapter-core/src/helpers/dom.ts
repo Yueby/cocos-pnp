@@ -1,6 +1,6 @@
-import { CheerioAPI } from "cheerio"
-import { getAdapterRCJson } from "@/utils"
-import { TChannel } from "@/typings"
+import { TChannel } from "@/typings";
+import { getAdapterRCJson } from "@/utils";
+import { CheerioAPI } from "cheerio";
 
 export const injectFromRCJson = async ($: CheerioAPI, channel: TChannel) => {
   const adapterJson = getAdapterRCJson()

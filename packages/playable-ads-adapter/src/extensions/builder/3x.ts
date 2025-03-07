@@ -95,11 +95,25 @@ export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
 	});
 };
 
+export const buildState = {
+	building: false,
+	listeners: new Set<(state: { building: boolean; error?: Error }) => void>(),
+	subscribe(callback: (state: { building: boolean; error?: Error }) => void) {
+		this.listeners.add(callback);
+		return () => this.listeners.delete(callback);
+	},
+	notify(building: boolean, error?: Error) {
+		this.building = building;
+		this.listeners.forEach(listener => listener({ building, error }));
+	}
+};
+
 export const builder3x = async () => {
 	try {
 		const { buildPlatform, projectRootPath, projectBuildPath } = getAdapterConfig();
 		console.info('开始构建项目');
 		console.info(`【构建平台】${buildPlatform}`);
+		buildState.notify(true);
 
 		const isSkipBuild = getRCSkipBuild();
 		const buildPath = join(projectRootPath, projectBuildPath);
@@ -117,5 +131,8 @@ export const builder3x = async () => {
 		console.info('构建完成');
 	} catch (error) {
 		console.error('构建失败:', error);
+		buildState.notify(false, error as Error);
+		return;
 	}
+	buildState.notify(false);
 };

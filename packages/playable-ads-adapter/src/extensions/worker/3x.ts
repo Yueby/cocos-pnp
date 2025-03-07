@@ -1,5 +1,5 @@
-import { parentPort, workerData } from 'worker_threads';
 import { exec3xAdapter } from 'playable-adapter-core';
+import { parentPort, workerData } from 'worker_threads';
 
 // 重写console的log和info方法，使其在主线程中打印
 const overrideConsole = () => {

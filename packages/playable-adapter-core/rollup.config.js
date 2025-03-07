@@ -1,14 +1,14 @@
-import commonjs from '@rollup/plugin-commonjs'
-import { nodeResolve } from '@rollup/plugin-node-resolve'
-import json from '@rollup/plugin-json'
-import isBuiltin from 'is-builtin-module';
-import replace from '@rollup/plugin-replace'
-import typescript from '@rollup/plugin-typescript';
+import alias from '@rollup/plugin-alias';
+import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
+import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
-import alias from '@rollup/plugin-alias'
-import dts from 'rollup-plugin-dts'
-import { minify } from 'uglify-js'
-import { readFileSync } from 'fs'
+import typescript from '@rollup/plugin-typescript';
+import { readFileSync } from 'fs';
+import isBuiltin from 'is-builtin-module';
+import dts from 'rollup-plugin-dts';
+import { minify } from 'uglify-js';
 
 const getJSCode = (jsPath) => {
   return JSON.stringify(minify(readFileSync(__dirname + jsPath).toString('utf-8')).code)

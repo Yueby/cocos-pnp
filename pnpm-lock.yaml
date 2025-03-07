@@ -158,6 +158,8 @@ importers:
         specifier: ^3.17.4
         version: 3.17.4
 
+  packages/playable-ads-adapter/dist/playable-ads-adapter: {}
+
 packages:
 
   '@babel/code-frame@7.18.6':

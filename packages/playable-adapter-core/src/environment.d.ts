@@ -1,6 +1,6 @@
-import { TAdapterRC, TPlatform } from './typings'
+import { TAdapterRC } from './typings';
 
-export {}
+export { };
 
 declare global {
   namespace NodeJS {

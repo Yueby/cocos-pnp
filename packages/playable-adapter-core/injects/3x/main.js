@@ -16,7 +16,7 @@
       window.__adapter_resource__ = JSON.parse(decompressed);
       __adapter_exec_js();
     } catch (error) {
-      console.error(error)
+      console.error(error);
       throw error;
     }
     console.timeEnd("load resource");

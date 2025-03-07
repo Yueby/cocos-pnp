@@ -4,7 +4,7 @@ import { injectFromRCJson } from '@/helpers/dom';
 import { jszipCode } from '@/helpers/injects';
 import { TBuilderOptions, TResourceData, TZipFromSingleFileOptions } from '@/typings';
 import { copyDirToPath, getAdapterRCJson, getOriginPkgPath, readToPath, replaceGlobalSymbol, writeToPath } from '@/utils';
-import { CheerioAPI, load } from 'cheerio';
+import { Cheerio, CheerioAPI, Element, load } from 'cheerio';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import JSZip from 'jszip';
 import { deflate } from 'pako';
@@ -118,31 +118,120 @@ const fillCodeToHTML = ($: CheerioAPI, options: TBuilderOptions) => {
 	}
 };
 
-export const exportSingleFile = async (singleFilePath: string, options: TBuilderOptions) => {
-	const { channel, transformHTML, transform } = options;
+// 修复初始化脚本的公共方法
+const fixInitScriptInHTML = ($: CheerioAPI) => {
+	console.log('开始检查脚本内容...');
+	$('script').each((index, element) => {
+		const content = $(element).html();
+		if (content) {
+			// 使用正则表达式匹配，忽略空格和换行
+			const regex = /__adapter_init_js\s*\(\s*\)\s*;/g;
+			if (regex.test(content)) {
+				console.log('找到 __adapter_init_js 函数调用：', content);
+				const newContent = content.replace(regex, '__adapter_init_js(!0);');
+				$(element).html(newContent);
+				console.log('替换后的内容：', newContent);
+			}
+		}
+	});
+	console.log('脚本检查完成');
+};
 
+// 创建渠道导出目录的公共方法
+const createChannelExportDir = (channel: string) => {
+	const { fileName = '', lang = '' } = getAdapterRCJson() || {};
+	const projectBuildPath = getGlobalProjectBuildPath();
+	const channelPath = join(projectBuildPath, channel.toLowerCase());
+	const outputFileName = `${fileName}${lang}${channel.toLowerCase()}`;
+
+	// 确保渠道目录存在
+	mkdirSync(channelPath, { recursive: true });
+
+	return {
+		channelPath,
+		outputFileName
+	};
+};
+
+// 安全删除目录的辅助函数
+const safeRemoveDir = (dirPath: string) => {
+	try {
+		if (existsSync(dirPath)) {
+			rmdirSync(dirPath, { recursive: true });
+		}
+	} catch (error) {
+		console.warn(`[警告] 删除目录 ${dirPath} 失败:`, error);
+	}
+};
+
+// 处理 HTML 的公共方法
+const processHTML = async ($: CheerioAPI, options: TBuilderOptions | TZipFromSingleFileOptions, outputPath: string) => {
+	const { transformHTML, fixInitScript } = options;
+
+	if (fixInitScript) {
+		console.log('修复init.js:' + options.channel);
+		fixInitScriptInHTML($);
+	}
+
+	await injectFromRCJson($, options.channel);
+
+	writeToPath(outputPath, $.html());
+
+	if (transformHTML) {
+		await transformHTML($);
+		writeToPath(outputPath, $.html());
+	}
+};
+
+// 处理脚本文件的公共方法
+const processScripts = async ($: CheerioAPI, tempDir: string, transformScript?: (scriptNode: Cheerio<Element>) => Promise<void>, useJsDir = false) => {
+	const scriptNodes = $('body script[type!="systemjs-importmap"]');
+	const jsDirname = useJsDir ? '/js' : '';
+	const jsPath = useJsDir ? join(tempDir, jsDirname) : tempDir;
+
+	if (useJsDir) {
+		mkdirSync(jsPath, { recursive: true });
+	}
+
+	for (let index = 0; index < scriptNodes.length; index++) {
+		const scriptNode = $(scriptNodes[index]);
+		if (transformScript) {
+			await transformScript(scriptNode);
+		}
+		let jsStr = scriptNode.text();
+		const jsFileName = `index${index}.js`;
+		const filePath = join(jsPath, jsFileName);
+		scriptNode.replaceWith(`<script src=".${jsDirname}/${jsFileName}"></script>`);
+		writeToPath(filePath, jsStr);
+	}
+};
+
+// 创建并处理临时目录的公共方法
+const withTempDir = async <T>(channelPath: string, callback: (tempDir: string) => Promise<T>): Promise<T> => {
+	const tempDir = join(channelPath, 'temp');
+	try {
+		safeRemoveDir(tempDir);
+		mkdirSync(tempDir, { recursive: true });
+		return await callback(tempDir);
+	} finally {
+		safeRemoveDir(tempDir);
+	}
+};
+
+export const exportSingleFile = async (singleFilePath: string, options: TBuilderOptions) => {
+	const { channel, transform } = options;
 	console.info(`[适配] 开始适配 ${channel} 渠道`);
-	const { fileName = '' } = getAdapterRCJson() || {};
 
 	try {
-		const singleHtml = readToPath(singleFilePath, 'utf-8');
-		const targetPath = join(getGlobalProjectBuildPath(), `${fileName}${channel.toLowerCase()}.html`);
+		const { channelPath, outputFileName } = createChannelExportDir(channel);
+		const targetPath = join(channelPath, `${outputFileName}.html`);
 
-		// Replace global variables.
-		let $ = load(singleHtml);
+		let $ = load(readToPath(singleFilePath, 'utf-8'));
 		fillCodeToHTML($, options);
-
-		// Inject additional configuration.
-		await injectFromRCJson($, channel);
-		writeToPath(targetPath, $.html());
-
-		if (transformHTML) {
-			await transformHTML($);
-			writeToPath(targetPath, $.html());
-		}
+		await processHTML($, options, targetPath);
 
 		if (transform) {
-			await transform(targetPath);
+			await transform(channelPath);
 		}
 
 		console.info(`[适配] ${channel} 渠道适配完成`);
@@ -153,44 +242,30 @@ export const exportSingleFile = async (singleFilePath: string, options: TBuilder
 };
 
 export const exportZipFromPkg = async (options: TBuilderOptions) => {
-	const { channel, transformHTML, transform } = options;
-
+	const { channel, transform } = options;
 	console.info(`[适配] 开始适配 ${channel} 渠道`);
-	const { fileName = '' } = getAdapterRCJson() || {};
 
 	try {
-		// Copy the folder.
-		const originPkgPath = getOriginPkgPath();
-		const projectBuildPath = getGlobalProjectBuildPath();
-		const destPath = join(projectBuildPath, `${fileName}${channel.toLowerCase()}`);
-		copyDirToPath(originPkgPath, destPath);
+		const { channelPath, outputFileName } = createChannelExportDir(channel);
 
-		// Replace global variables.
-		replaceGlobalSymbol(destPath, channel);
+		await withTempDir(channelPath, async (tempDir) => {
+			// 复制并处理文件
+			copyDirToPath(getOriginPkgPath(), tempDir);
+			replaceGlobalSymbol(tempDir, channel);
 
-		// Inject additional configuration.
-		const singleHtmlPath = join(destPath, '/index.html');
-		const singleHtml = readToPath(singleHtmlPath, 'utf-8');
-		const $ = load(singleHtml);
-		await injectFromRCJson($, channel);
+			// 处理 HTML
+			const htmlPath = join(tempDir, '/index.html');
+			let $ = load(readToPath(htmlPath, 'utf-8'));
+			await processHTML($, options, htmlPath);
 
-		// Add the SDK script.
-		if (transformHTML) {
-			await transformHTML($);
-		}
+			if (transform) {
+				await transform(tempDir);
+			}
 
-		// Update the HTML file.
-		writeToPath(singleHtmlPath, $.html());
-
-		if (transform) {
-			await transform(destPath);
-		}
-
-		// 创建新的JSZip实例
-		const newZip = new JSZip();
-
-		// Pack in zip
-		await createZip(getGlobalProjectBuildPath(), [destPath], `${fileName}${channel.toLowerCase()}`, newZip);
+			// 打包
+			const newZip = new JSZip();
+			await createZip(channelPath, [tempDir], outputFileName, newZip);
+		});
 
 		console.info(`[适配] ${channel} 渠道适配完成`);
 	} catch (error) {
@@ -200,86 +275,44 @@ export const exportZipFromPkg = async (options: TBuilderOptions) => {
 };
 
 export const exportZipFromSingleFile = async (singleFilePath: string, options: TZipFromSingleFileOptions) => {
-	const { channel, transformHTML, transform, transformScript, exportType } = options;
-
+	const { channel, transform, transformScript, exportType } = options;
 	console.info(`[适配] 开始适配 ${channel} 渠道`);
-	const { fileName = '' } = getAdapterRCJson() || {};
 
 	try {
-		// Copy the folder.
-		const singleHtmlPath = singleFilePath;
-		const projectBuildPath = getGlobalProjectBuildPath();
-		const destPath = join(projectBuildPath, `${fileName}${channel.toLowerCase()}`);
+		const { channelPath, outputFileName } = createChannelExportDir(channel);
 
-		// Create destination directory
-		mkdirSync(destPath, { recursive: true });
+		await withTempDir(channelPath, async (tempDir) => {
+			// 处理 HTML
+			let $ = load(readToPath(singleFilePath, 'utf-8'));
+			fillCodeToHTML($, options);
 
-		// HTML file path.
-		const htmlPath = join(destPath, '/index.html');
+			const htmlPath = join(tempDir, 'index.html');
 
-		let $ = load(readToPath(singleHtmlPath, 'utf-8'));
-		fillCodeToHTML($, options);
+			// 先处理 HTML（包括修复初始化脚本）
+			await processHTML($, options, htmlPath);
 
-		// Inject configuration file.
-		await injectFromRCJson($, channel);
-
-		// To extract all scripts and generate a JavaScript file
-		const scriptNodes = $('body script[type!="systemjs-importmap"]');
-
-		if (exportType === 'dirZip') {
-			// Create a "js" directory.
-			const jsDirname = '/js';
-			const jsDirPath = join(destPath, jsDirname);
-			mkdirSync(jsDirPath, { recursive: true });
-
-			// Process scripts and move them to js directory
-			for (let index = 0; index < scriptNodes.length; index++) {
-				const scriptNode = $(scriptNodes[index]);
-				if (transformScript) {
-					await transformScript(scriptNode);
-				}
-				let jsStr = scriptNode.text();
-				const jsFileName = `index${index}.js`;
-				const jsPath = join(jsDirPath, jsFileName);
-				scriptNode.replaceWith(`<script src=".${jsDirname}/${jsFileName}"></script>`);
-				writeToPath(jsPath, jsStr);
+			// 添加 base 标签
+			if ($('head base').length === 0) {
+				$('head').prepend('<base href="./">');
 			}
-		} else {
-			// For zip type, keep all files in the same directory
 
-			for (let index = 0; index < scriptNodes.length; index++) {
-				const scriptNode = $(scriptNodes[index]);
-				if (transformScript) {
-					await transformScript(scriptNode);
-				}
-				let jsStr = scriptNode.text();
-				const jsFileName = `index${index}.js`;
-				const jsPath = join(destPath, jsFileName);
-				scriptNode.replaceWith(`<script src="./${jsFileName}"></script>`);
-				writeToPath(jsPath, jsStr);
-			}
-		}
-
-		// Add base tag to ensure correct resource paths
-		if ($('head base').length === 0) {
-			$('head').prepend('<base href="./">');
-		}
-
-		writeToPath(htmlPath, $.html());
-
-		if (transformHTML) {
-			await transformHTML($);
+			// 写入初始 HTML
 			writeToPath(htmlPath, $.html());
-		}
 
-		if (transform) {
-			await transform(destPath);
-		}
+			// 处理脚本（将脚本内容移到单独文件）
+			await processScripts($, tempDir, transformScript, exportType === 'dirZip');
 
-		// Pack in zip
-		const newZip = new JSZip();
+			// 再次写入 HTML，确保脚本标签更新
+			writeToPath(htmlPath, $.html());
 
-		await createZip(getGlobalProjectBuildPath(), [destPath], `${fileName}${channel.toLowerCase()}`, newZip);
+			if (transform) {
+				await transform(tempDir);
+			}
+
+			// 打包
+			const newZip = new JSZip();
+			await createZip(channelPath, [tempDir], outputFileName, newZip);
+		});
 
 		console.info(`[适配] ${channel} 渠道适配完成`);
 	} catch (error) {

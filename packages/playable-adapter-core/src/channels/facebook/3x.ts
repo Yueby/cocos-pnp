@@ -11,6 +11,7 @@ export const export3xFacebook = async (options: TChannelPkgOptions) => {
 		transformHTML: async ($) => {
 			$('body script').first().before(SET_GET_GAMEPADS_NULL);
 		},
-		exportType: 'zip'
+		exportType: 'zip',
+		fixInitScript: true
 	});
 };

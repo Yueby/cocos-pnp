@@ -444,6 +444,7 @@ type TChannelRC = {
 type TAdapterRC = {
 	fileName?: string;
 	title?: string;
+	lang?: string;
 	iosUrl?: string;
 	androidUrl?: string;
 	buildPlatform?: Platform;

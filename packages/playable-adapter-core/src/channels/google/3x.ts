@@ -13,9 +13,9 @@ export const export3xGoogle = async (options: TChannelPkgOptions) => {
 		transformHTML: async ($) => {
 			// 增加横竖屏meta
 			const orientationMap = {
-				'landscape': LANDSCAPE_META,
-				'portrait': PORTRAIT_META,
-				'auto': AUTO_META
+				landscape: LANDSCAPE_META,
+				portrait: PORTRAIT_META,
+				auto: AUTO_META
 			};
 			// 使用映射获取对应的meta，如果不存在则默认使用竖屏
 			const orientationStr = orientationMap[orientation] || PORTRAIT_META;
@@ -32,6 +32,7 @@ export const export3xGoogle = async (options: TChannelPkgOptions) => {
 		//   await zipToPath(destPath)
 		//   unlinkSync(destPath)
 		// }
-		exportType: 'zip'
+		exportType: 'zip',
+		fixInitScript: true
 	});
 };

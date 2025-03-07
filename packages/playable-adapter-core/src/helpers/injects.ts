@@ -6,6 +6,7 @@ export const injects2xCode = {
 export const injects3xCode = {
   init: __adapter_init_3x_code__,
   main: __adapter_main_3x_code__,
+  
 }
 
 export const jszipCode = __adapter_jszip_code__

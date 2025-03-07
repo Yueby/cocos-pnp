@@ -16,7 +16,9 @@
     ],
     "messages": {
       "adapter-build": {
-        "methods": ["builder3x"]
+        "methods": [
+          "builder3x"
+        ]
       }
     }
   }

@@ -183,28 +183,31 @@ window.__adapter_init = function () {
     };
   }
 
-  function __adapter_init_js() {
+  function __adapter_init_js(useFix) {
     const _createScript = System.__proto__.createScript;
     System.__proto__.createScript = function (url) {
-      let res = __adapter_get_script(url.replace(__adapter_get_base_url(), ''));
-
+      let baseUrl = url.replace(__adapter_get_base_url(), '');
+      let res = __adapter_get_script(baseUrl);
       if (!res) {
         console.error(`${url} 找不到资源`);
         return _createScript.call(this, url);
       }
 
-      // 创建新的 script 元素
-      const script = document.createElement('script');
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.text = res;
-
-      // 模拟加载完成事件
-      setTimeout(() => {
-        script.dispatchEvent(new Event('load'));
-      });
-
-      return script;
+      if (useFix) {
+        // fix 版本的实现
+        const script = document.createElement('script');
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.text = res;
+        setTimeout(() => {
+          script.dispatchEvent(new Event('load'));
+        });
+        return script;
+      } else {
+        // 默认版本的实现
+        const blob = new Blob([res], { type: 'text/javascript' });
+        return _createScript.call(this, URL.createObjectURL(blob));
+      }
     };
   }
 

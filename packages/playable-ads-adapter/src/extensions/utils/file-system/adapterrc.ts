@@ -6,7 +6,8 @@ import { readToPath } from './base';
 const iosTag: string = '<ios>';
 const androidTag: string = '<android>';
 
-export const readAdapterRCFile = (): TAdapterRC | null => {
+// 基础读取配置文件的函数
+export const readAdapterRCFileBase = (): TAdapterRC | null => {
 	try {
 		const projectRootPath = Editor.Project.path;
 		const adapterRCJsonPath = `${projectRootPath}${ADAPTER_RC_PATH}`;
@@ -25,19 +26,6 @@ export const readAdapterRCFile = (): TAdapterRC | null => {
 		if (!fileContent) return null;
 		
 		let config = <TAdapterRC>JSON.parse(fileContent);
-		
-		// 处理注入选项
-		if (config.injectOptions) {
-			for (const channel in config.injectOptions) {
-				if (config.injectOptions.hasOwnProperty(channel)) {
-					const typedChannel = channel as keyof typeof config.injectOptions;
-					const channelConfig = config.injectOptions[typedChannel];
-					if (channelConfig && channelConfig.body) {
-						config.injectOptions[typedChannel].body = modifyBody(channelConfig.body, config);
-					}
-				}
-			}
-		}
 		return config;
 	} catch (error) {
 		console.error('读取配置文件失败:', error);
@@ -45,7 +33,32 @@ export const readAdapterRCFile = (): TAdapterRC | null => {
 	}
 };
 
-const modifyBody = (body: string, config: TAdapterRC): string => {
+// 用于构建时读取配置，会替换占位符
+export const readAdapterRCFile = (): TAdapterRC | null => {
+	const config = readAdapterRCFileBase();
+	if (!config) return null;
+
+	// 处理注入选项
+	if (config.injectOptions) {
+		for (const channel in config.injectOptions) {
+			if (config.injectOptions.hasOwnProperty(channel)) {
+				const typedChannel = channel as keyof typeof config.injectOptions;
+				const channelConfig = config.injectOptions[typedChannel];
+				if (channelConfig && channelConfig.body) {
+					config.injectOptions[typedChannel].body = modifyBody(channelConfig.body, config);
+				}
+			}
+		}
+	}
+	return config;
+};
+
+// 用于面板读取配置，保持占位符
+export const readAdapterRCFileForPanel = (): TAdapterRC | null => {
+	return readAdapterRCFileBase();
+};
+
+export const modifyBody = (body: string, config: TAdapterRC): string => {
 	if (!body) return '';
 	const { iosUrl = '', androidUrl = '' } = config || {};
 	return body.replaceAll(iosTag, iosUrl).replaceAll(androidTag, androidUrl);
