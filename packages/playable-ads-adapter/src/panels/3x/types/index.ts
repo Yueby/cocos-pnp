@@ -40,3 +40,11 @@ export interface ICustomPanelThis extends IPanelThis {
 export type TCustomPanelElements = TPanelElements & {
 	[key in TAdapterRCKeysExcluded]: HTMLCustomElement;
 };
+
+export type TStoreInfo = {
+	name: string; // 游戏名称
+	ios: string; // iOS 商店链接
+	android: string; // 安卓商店链接
+};
+
+export type TStoreConfig = TStoreInfo[]; // 商店信息数组

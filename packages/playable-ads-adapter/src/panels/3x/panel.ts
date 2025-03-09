@@ -7,7 +7,8 @@ import { buildState } from '../../extensions/builder/3x';
 import { ADAPTER_RC_PATH } from '../../extensions/constants';
 import { readAdapterRCFileForPanel } from '../../extensions/utils/file-system/adapterrc';
 import { CHANNEL_OPTIONS, CONFIG, EVENT_TYPES, IDS, SELECTORS, STYLE, TEMPLATE } from './config';
-import { HTMLCustomElement, ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCustomPanelElements } from './types';
+import { HTMLCustomElement, ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCustomPanelElements, TStoreConfig } from './types';
+import { delay } from "@/extensions/utils";
 
 let panel: ICustomPanelThis;
 let unsubscribeBuildState: (() => void) | null = null;
@@ -16,14 +17,17 @@ export const style = STYLE;
 export const template = TEMPLATE;
 export const $ = SELECTORS;
 
-export async function ready(options: ITaskOptions) {
-	// @ts-ignore
-	panel = this as ICustomPanelThis;
-	panel.options = options;
-
-	// 注册构建状态监听器
+/**
+ * 初始化构建状态监听器
+ */
+function initBuildStateListener() {
 	unsubscribeBuildState = buildState.subscribe(({ building, error }) => {
 		const mask = panel.$[IDS.BUILDING_MASK];
+		if (!mask) {
+			console.error('找不到构建遮罩层元素');
+			return;
+		}
+
 		if (building) {
 			mask.classList.add('active');
 			console.log('构建中...');
@@ -34,107 +38,106 @@ export async function ready(options: ITaskOptions) {
 			}
 		}
 	});
+}
 
-	// 读取配置文件
-	const config = readAdapterRCFileForPanel();
-	if (config) {
-		// 直接使用读取到的配置
+/**
+ * 初始化面板UI状态
+ * @param hasConfig 是否有配置文件
+ */
+function initPanelState(hasConfig: boolean) {
+	if (hasConfig) {
 		showConfigPanel();
-		initConfigPanelButtons(); // 初始化配置面板按钮
-		setOptions(config);
-
-		init();
+		initConfigPanelButtons();
 	} else {
 		hideConfigPanel();
-		initCreatePanelButtons(); // 初始化创建面板按钮
+		initCreatePanelButtons();
 	}
 }
 
 /**
- * all change of options dispatched will enter here
- * @param options
- * @param key
- * @returns
+ * 初始化商店配置
+ * @param config 配置对象
+ */
+async function initStoreConfig(config: TAdapterRC) {
+	if (!config.storePath) {
+		return;
+	}
+
+	try {
+		const storeConfig = await readStoreConfig(config.storePath);
+		createStoreSection(storeConfig);
+	} catch (err) {
+		console.error('初始化商店配置失败:', err);
+	}
+}
+
+/**
+ * 初始化面板配置
+ * @param config 配置对象
+ */
+async function initPanelConfig(config: TAdapterRC) {
+	try {
+		setOptions(config);
+		init();
+		await initStoreConfig(config);
+	} catch (err) {
+		console.error('初始化面板配置失败:', err);
+	}
+}
+
+export async function ready(options: ITaskOptions) {
+	try {
+		// 初始化面板实例
+		// @ts-ignore
+		panel = this as ICustomPanelThis;
+		panel.options = options;
+
+		// 初始化构建状态监听器
+		initBuildStateListener();
+
+		// 读取配置文件
+		const config = readAdapterRCFileForPanel();
+
+		// 初始化面板状态
+		initPanelState(!!config);
+
+		// 如果有配置，初始化面板配置
+		if (config) {
+			await initPanelConfig(config);
+		}
+	} catch (err) {
+		console.error('面板初始化失败:', err);
+	}
+}
+
+/**
+ * 更新面板配置
+ * @param options 任务选项
+ * @param key 更新的键
  */
 export async function update(options: ITaskOptions, key: string) {
 	try {
-		await saveConfigToFile(options);
-
-		// 重新读取配置文件并刷新面板
-		const newConfig = readAdapterRCFileForPanel();
-		if (newConfig) {
-			await applyConfig(newConfig, false);
+		// 先应用配置到UI
+		const config = options.packages[PACKAGE_NAME];
+		if (config) {
+			applyConfig(config);
 		}
+
+		// 然后保存到文件
+		await saveConfigToFile(config);
 	} catch (err: any) {
-		console.error('配置文件更新失败:', err.message);
+		console.error('更新配置失败:', err.message);
 	}
 
 	if (!key) {
 		init();
-		return;
 	}
-}
-
-async function saveConfigToFile(options: ITaskOptions) {
-	const projectPath = Editor.Project.path;
-	const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
-
-	// 获取配置并移除空值
-	const config = options.packages[PACKAGE_NAME as keyof typeof options.packages];
-	const cleanConfig = removeEmptyValues(config);
-
-	await promises.writeFile(configPath, JSON.stringify(cleanConfig, null, 2));
-	console.log(`保存配置到 ${configPath}`);
 }
 
 /**
- * 移除对象中的空值（空字符串、空数组、空对象）
+ * 关闭面板
  */
-function removeEmptyValues(obj: any): any {
-	if (!obj || typeof obj !== 'object') return obj;
-
-	// 处理数组
-	if (Array.isArray(obj)) {
-		const filtered = obj.filter((item) => {
-			if (typeof item === 'string') return item !== '';
-			if (typeof item === 'object') return item !== null && Object.keys(removeEmptyValues(item)).length > 0;
-			return true;
-		});
-		return filtered.length > 0 ? filtered : undefined;
-	}
-
-	// 处理对象
-	const result: any = {};
-	for (const [key, value] of Object.entries(obj)) {
-		// 字符串：非空
-		if (typeof value === 'string' && value !== '') {
-			result[key] = value;
-		}
-		// 数组：非空且有内容
-		else if (Array.isArray(value) && value.length > 0) {
-			const cleanArray = removeEmptyValues(value);
-			if (cleanArray && cleanArray.length > 0) {
-				result[key] = cleanArray;
-			}
-		}
-		// 对象：非空且有属性
-		else if (value !== null && typeof value === 'object') {
-			const cleanObj = removeEmptyValues(value);
-			if (cleanObj && Object.keys(cleanObj).length > 0) {
-				result[key] = cleanObj;
-			}
-		}
-		// 布尔值和数字：保留
-		else if (typeof value === 'boolean' || typeof value === 'number') {
-			result[key] = value;
-		}
-	}
-
-	return result;
-}
-
 export function close() {
-	// 如果面板未初始化，直接返回
 	if (!panel || !panel.$) {
 		return;
 	}
@@ -146,6 +149,7 @@ export function close() {
 			unsubscribeBuildState = null;
 		}
 
+		// 移除根元素
 		const root = panel.$.root;
 		if (root) {
 			root.remove();
@@ -207,6 +211,30 @@ function initBaseConfig() {
 		input.value = config[field] ?? '';
 		addEventListenerWithDispatch(input, 'confirm', field);
 	});
+
+	// 商店配置路径
+	const storePath = panel.$['storePath'];
+	if (storePath) {
+		storePath.value = config.storePath ?? '';
+		storePath.addEventListener(EVENT_TYPES.CHANGE, async (event: any) => {
+			const path = event.target.value;
+			// 更新配置
+			panel.dispatch('update', `packages.${PACKAGE_NAME}.storePath`, path);
+
+			// 如果路径存在，读取并更新商店配置
+			if (path) {
+				try {
+					const storeConfig = await readStoreConfig(path);
+					createStoreSection(storeConfig);
+				} catch (err) {
+					console.error('处理商店配置失败:', err);
+				}
+			} else {
+				// 如果路径为空，清空商店配置区域
+				createStoreSection([]);
+			}
+		});
+	}
 
 	// 屏幕方向
 	// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查 orientation 是否存在
@@ -307,6 +335,91 @@ function updateInjectOptions() {
 }
 
 /**
+ * 移除对象中的空值
+ * @param obj 要处理的对象
+ * @returns 处理后的对象
+ */
+function removeEmptyValues(obj: any): any {
+	if (obj === null || obj === undefined) {
+		return undefined;
+	}
+
+	if (Array.isArray(obj)) {
+		const filteredArray = obj.filter(item =>
+			item !== null &&
+			item !== undefined &&
+			item !== '' &&
+			item !== 'undefined'
+		);
+		return filteredArray.length > 0 ? filteredArray.map(item => removeEmptyValues(item)) : undefined;
+	}
+
+	if (typeof obj === 'object') {
+		const result: any = {};
+		let hasValidValues = false;
+
+		for (const key in obj) {
+			const value = removeEmptyValues(obj[key]);
+			if (value !== undefined) {
+				result[key] = value;
+				hasValidValues = true;
+			}
+		}
+
+		return hasValidValues ? result : undefined;
+	}
+
+	// 处理字符串类型
+	if (typeof obj === 'string') {
+		return obj === '' || obj === 'undefined' ? undefined : obj;
+	}
+
+	return obj;
+}
+
+/**
+ * 保存配置到文件
+ * @param config 任务选项
+ */
+async function saveConfigToFile(config: TAdapterRC) {
+	const projectPath = Editor.Project.path;
+	const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
+
+	try {
+
+		// 转换为JSON字符串
+		const configStr = JSON.stringify(config, null, 2);
+
+		// 验证JSON格式
+		JSON.parse(configStr);
+
+		// 完整替换文件内容
+		await promises.writeFile(configPath, configStr, { encoding: 'utf8', flag: 'w' });
+		console.log(`配置已保存到 ${configPath}`);
+	} catch (err) {
+		console.error('保存配置失败:', err);
+		throw new Error('配置格式无效，无法保存');
+	}
+}
+
+/**
+ * 获取配置选项
+ */
+function getOptions() {
+	const options = panel.options.packages[PACKAGE_NAME] || {};
+	return options;
+}
+
+/**
+ * 设置配置选项
+ * @param options 配置选项
+ */
+function setOptions(options: TAdapterRC) {
+	panel.options.packages[PACKAGE_NAME] = options;
+	panel.dispatch('update', `packages.${PACKAGE_NAME}`, options);
+}
+
+/**
  * 创建默认的注入选项
  */
 function createDefaultInjectOptions(): Record<TChannel, TChannelRC> {
@@ -342,6 +455,27 @@ function createDefaultConfig(): TAdapterRC {
 	};
 }
 
+/**
+ * 应用配置到UI
+ * @param config 配置对象
+ */
+function applyConfig(config: TAdapterRC) {
+	try {
+		// 更新配置
+		setOptions(config);
+
+		// 更新 UI
+		showConfigPanel();
+		initConfigPanelButtons();
+		init();
+
+		return true;
+	} catch (err: any) {
+		console.error(`${err.message}`);
+		return false;
+	}
+}
+
 // 修改创建配置按钮的处理函数
 const handleCreateConfigClick = async () => {
 	try {
@@ -349,15 +483,12 @@ const handleCreateConfigClick = async () => {
 		const projectPath = Editor.Project.path;
 		const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
-		// 写入默认配置
-		await promises.writeFile(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
-		
-		// 重新读取并应用配置（不保存文件）
-		const newConfig = readAdapterRCFileForPanel();
-		if (newConfig) {
-			await applyConfig(newConfig, false);
-			console.log('成功创建并应用默认配置');
-		}
+		// 先应用默认配置到UI
+		applyConfig(defaultConfig);
+
+		// 完整替换文件内容
+		await promises.writeFile(configPath, JSON.stringify(defaultConfig, null, 2), { encoding: 'utf8', flag: 'w' });
+		console.log('成功创建并保存默认配置');
 	} catch (err: any) {
 		console.error('创建配置文件失败:', err.message);
 	}
@@ -398,14 +529,14 @@ async function handleFileOperation(operation: 'import' | 'export'): Promise<void
 function getDialogConfig(operation: 'import' | 'export') {
 	return operation === 'import'
 		? {
-				title: '选择配置文件',
-				type: 'file' as const,
-				filters: [{ name: 'JSON', extensions: ['json'] }]
-		  }
+			title: '选择配置文件',
+			type: 'file' as const,
+			filters: [{ name: 'JSON', extensions: ['json'] }]
+		}
 		: {
-				title: '选择导出目录',
-				type: 'directory' as const
-		  };
+			title: '选择导出目录',
+			type: 'directory' as const
+		};
 }
 
 async function processFileOperation(operation: 'import' | 'export', filePath: string) {
@@ -416,36 +547,6 @@ async function processFileOperation(operation: 'import' | 'export', filePath: st
 	}
 }
 
-/**
- * 应用配置并更新 UI
- * @param config 配置对象
- * @param saveToFile 是否保存配置到文件，默认为 true
- */
-async function applyConfig(config: TAdapterRC, saveToFile: boolean = true) {
-	// 更新配置
-	setOptions(config);
-
-	// 更新 UI
-	showConfigPanel();
-	initConfigPanelButtons();
-	init();
-
-	// 如果需要，保存到文件
-	if (saveToFile) {
-		try {
-			const projectPath = Editor.Project.path;
-			const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
-			await promises.writeFile(configPath, JSON.stringify(config, null, 2));
-			console.log(`配置已保存到 ${configPath}`);
-		} catch (err: any) {
-			console.error(`保存配置文件失败: ${err.message}`);
-			return false;
-		}
-	}
-
-	return true;
-}
-
 async function handleImport(filePath: string) {
 	try {
 		// 检查源文件是否存在
@@ -454,10 +555,10 @@ async function handleImport(filePath: string) {
 			return;
 		}
 
-		// 读取源文件内容并验证
+		// 读取源文件内容
 		const content = await promises.readFile(filePath, 'utf8');
-		let config: any;
-		
+		let config: TAdapterRC;
+
 		try {
 			config = JSON.parse(content);
 		} catch (err) {
@@ -469,30 +570,26 @@ async function handleImport(filePath: string) {
 		const projectPath = Editor.Project.path;
 		const targetPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
-		// 删除现有配置文件（如果存在）
-		if (existsSync(targetPath)) {
-			await promises.unlink(targetPath);
-		}
-
-		// 直接复制文件
-		await promises.copyFile(filePath, targetPath);
-
-		// 重新读取并应用配置（不保存文件）
-		const newConfig = readAdapterRCFileForPanel();
-		if (newConfig) {
-			await applyConfig(newConfig, false);
-			console.log(`从 ${filePath} 导入配置并应用成功`);
-		}
+		applyConfig(config);
 	} catch (err: any) {
 		console.error(`导入配置失败: ${err.message}`);
 	}
 }
 
 async function handleExport(dirPath: string) {
-	const config = getOptions();
-	const exportPath = `${dirPath}${ADAPTER_RC_PATH}`;
-	await promises.writeFile(exportPath, JSON.stringify(config, null, 2));
-	console.log(`导出配置到 ${exportPath}`);
+	try {
+		const config = getOptions();
+		const exportPath = `${dirPath}${ADAPTER_RC_PATH}`;
+		
+		// 转换为JSON字符串
+		const configStr = JSON.stringify(config, null, 2);
+		
+		// 完整替换文件内容
+		await promises.writeFile(exportPath, configStr, { encoding: 'utf8', flag: 'w' });
+		console.log(`配置已导出到 ${exportPath}`);
+	} catch (err: any) {
+		console.error(`导出配置失败: ${err.message}`);
+	}
 }
 
 // 定义事件处理函数
@@ -555,15 +652,6 @@ async function handleOpenConfig() {
 	}
 }
 
-function getOptions() {
-	const options = panel.options.packages[PACKAGE_NAME] || {};
-	return options;
-}
-
-function setOptions(options: TAdapterRC) {
-	panel.options.packages[PACKAGE_NAME] = options;
-}
-
 function getStyle(selector: string): CSSStyleDeclaration {
 	const element = panel.$[selector];
 	if (!element) {
@@ -576,3 +664,105 @@ function getStyle(selector: string): CSSStyleDeclaration {
 		return element.style;
 	}
 }
+
+// 添加读取商店配置的函数
+async function readStoreConfig(storePath: string): Promise<TStoreConfig> {
+	try {
+		const content = await promises.readFile(storePath, 'utf8');
+		return JSON.parse(content);
+	} catch (err) {
+		console.error('读取商店配置失败:', err);
+		return [];
+	}
+}
+
+// 修改创建商店配置区域的函数
+function createStoreSection(storeConfig: TStoreConfig) {
+	const container = panel.$[IDS.STORE_CONTAINER];
+	if (!container || !(container instanceof HTMLElement)) {
+		console.error('商店配置容器无效或不是 HTMLElement');
+		return;
+	}
+
+	// 获取 ui-file 元素
+	const storePathElement = panel.$['storePath'];
+	if (!storePathElement || !(storePathElement instanceof HTMLElement)) {
+		console.error('商店配置路径输入框无效或不是 HTMLElement');
+		return;
+	}
+
+	// 清除除了 ui-file 以外的所有内容
+	Array.from(container.children).forEach(child => {
+		if (child !== storePathElement && child.id !== 'storePath') {
+			container.removeChild(child);
+		}
+	});
+
+	// 如果没有配置，直接返回
+	if (!Array.isArray(storeConfig) || storeConfig.length === 0) {
+		console.log('没有商店配置数据');
+		return;
+	}
+
+	try {
+		storeConfig.forEach(store => {
+			if (!store || typeof store !== 'object') {
+				console.warn('无效的商店配置项:', store);
+				return;
+			}
+
+			// 创建商店配置组
+			const storeSection = document.createElement('ui-section');
+			storeSection.setAttribute('header', store.name || '未命名商店');
+
+			// 创建iOS URL部分
+			const iosProps = document.createElement('ui-prop');
+			const iosLabel = document.createElement('ui-label');
+			iosLabel.setAttribute('slot', 'label');
+			iosLabel.setAttribute('value', 'iOS URL');
+			const iosInput = document.createElement('ui-input');
+			iosInput.setAttribute('slot', 'content');
+			iosInput.setAttribute('value', store.ios || '');
+			iosInput.setAttribute('readonly', '');
+			iosProps.appendChild(iosLabel);
+			iosProps.appendChild(iosInput);
+			storeSection.appendChild(iosProps);
+
+			// 创建Android URL部分
+			const androidProps = document.createElement('ui-prop');
+			const androidLabel = document.createElement('ui-label');
+			androidLabel.setAttribute('slot', 'label');
+			androidLabel.setAttribute('value', 'Android URL');
+			const androidInput = document.createElement('ui-input');
+			androidInput.setAttribute('slot', 'content');
+			androidInput.setAttribute('value', store.android || '');
+			androidInput.setAttribute('readonly', '');
+			androidProps.appendChild(androidLabel);
+			androidProps.appendChild(androidInput);
+			storeSection.appendChild(androidProps);
+
+			// 创建应用按钮容器
+			const buttonContainer = document.createElement('div');
+			buttonContainer.style.textAlign = 'right';
+			buttonContainer.style.marginTop = '4px';
+
+			// 创建应用按钮
+			const applyButton = document.createElement('ui-button');
+			applyButton.textContent = '应用';
+			applyButton.addEventListener(EVENT_TYPES.CLICK, async () => {
+				const options = getOptions();
+				options.iosUrl = store.ios || '';
+				options.androidUrl = store.android || '';
+				panel.dispatch('update', `packages.${PACKAGE_NAME}`, options);
+			});
+
+			buttonContainer.appendChild(applyButton);
+			storeSection.appendChild(buttonContainer);
+
+			container.appendChild(storeSection);
+		});
+	} catch (err) {
+		console.error('创建商店配置区域时出错:', err);
+	}
+}
+

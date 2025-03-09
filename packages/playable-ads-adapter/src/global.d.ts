@@ -346,7 +346,7 @@ type TBuildOptions = {
 		height: number;
 	};
 
-	win32: { REMOTE_SERVER_ROOT: string; width: number; height: number };
+	win32: { REMOTE_SERVER_ROOT: string; width: number; height: number; };
 
 	'android-instant': {
 		packageName: string;
@@ -458,9 +458,10 @@ type TAdapterRC = {
 	tinify?: boolean;
 	tinifyApiKey?: string;
 	isZip?: boolean;
+	storePath?: string;
 };
 
-type TResourceData = { [key: string]: string };
+type TResourceData = { [key: string]: string; };
 
 type TResZipInfo = {
 	key: string;

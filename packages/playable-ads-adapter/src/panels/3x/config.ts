@@ -5,30 +5,31 @@ export const ORIENTATIONS: TWebOrientations[] = ['auto', 'portrait', 'landscape'
 
 // 配置常量
 export const CONFIG = {
-	DEFAULT_BUILD_PLATFORM: 'web-mobile',
-	DEFAULT_ORIENTATION: 'auto',
-	INJECT_FIELDS: ['head', 'body', 'sdkScript'] as const
+    DEFAULT_BUILD_PLATFORM: 'web-mobile',
+    DEFAULT_ORIENTATION: 'auto',
+    INJECT_FIELDS: ['head', 'body', 'sdkScript'] as const
 } as const;
 
 export const IDS = {
-	CONFIG_BUTTONS: 'configButtons',
-	CREATE_BUTTONS: 'createButtons',
-	NO_CONFIG_TIP: 'noConfigTip',
-	CONFIG_PANEL: 'configPanel',
-	OPEN_CONFIG: 'openConfig',
-	IMPORT_CONFIG: 'importConfig',
-	EXPORT_CONFIG: 'exportConfig',
-	IMPORT_CONFIG_CREATE: 'importConfigCreate',
-	CREATE_CONFIG: 'createConfig',
-	BUILD: 'build',
-	BUILDING_MASK: 'buildingMask'
+    CONFIG_BUTTONS: 'configButtons',
+    CREATE_BUTTONS: 'createButtons',
+    NO_CONFIG_TIP: 'noConfigTip',
+    CONFIG_PANEL: 'configPanel',
+    OPEN_CONFIG: 'openConfig',
+    IMPORT_CONFIG: 'importConfig',
+    EXPORT_CONFIG: 'exportConfig',
+    IMPORT_CONFIG_CREATE: 'importConfigCreate',
+    CREATE_CONFIG: 'createConfig',
+    BUILD: 'build',
+    BUILDING_MASK: 'buildingMask',
+    STORE_CONTAINER: 'storeContainer'
 } as const;
 
 // 事件类型
 export const EVENT_TYPES = {
-	CLICK: 'click',
-	CHANGE: 'change',
-	CONFIRM: 'confirm'
+    CLICK: 'click',
+    CHANGE: 'change',
+    CONFIRM: 'confirm'
 } as const;
 
 export const STYLE = `
@@ -42,7 +43,7 @@ export const STYLE = `
     min-width: 80px;
 }
 .section-header {
-    padding: 12px 0;
+    padding: 12px 0 0 0;
     font-size: 14px;
     font-weight: bold;
     border-bottom: 1px solid var(--color-border);
@@ -100,16 +101,7 @@ export const TEMPLATE = `
         </div>
     </div>
     <div id="${IDS.CONFIG_PANEL}">
-        <!-- 基础配置 -->
-        <ui-prop>
-            <ui-label slot="label" value="文件名"></ui-label>
-            <ui-input slot="content" id="fileName"></ui-input>
-        </ui-prop>
-
-        <ui-prop>
-            <ui-label slot="label" value="语言"></ui-label>
-            <ui-input slot="content" id="lang"></ui-input>
-        </ui-prop>
+        <div class="section-header">基础配置</div>
         <ui-prop>
             <ui-label slot="label" value="iOS URL"></ui-label>
             <ui-input slot="content" id="iosUrl"></ui-input>
@@ -117,6 +109,18 @@ export const TEMPLATE = `
         <ui-prop>
             <ui-label slot="label" value="Android URL"></ui-label>
             <ui-input slot="content" id="androidUrl"></ui-input>
+        </ui-prop>
+        <ui-section id="${IDS.STORE_CONTAINER}" header="商店配置选项">
+            <ui-file id="storePath" value="" type="file"></ui-file>
+            <!-- 内容动态添加 -->
+        </ui-section>
+        <ui-prop>
+            <ui-label slot="label" value="文件名"></ui-label>
+            <ui-input slot="content" id="fileName"></ui-input>
+        </ui-prop>
+        <ui-prop>
+            <ui-label slot="label" value="语言"></ui-label>
+            <ui-input slot="content" id="lang"></ui-input>
         </ui-prop>
         <ui-prop>
             <ui-label slot="label" value="构建平台"></ui-label>
@@ -162,17 +166,17 @@ export const TEMPLATE = `
         </ui-section>
         <div id="channelContainer" class="channel-list">
             ${CHANNEL_OPTIONS.map(
-				(channel) => `
+    (channel) => `
                 <ui-button id="${channel}" class="small" type="default">${channel}</ui-button>
             `
-			).join('')}
+).join('')}
         </div>
 
         <div class="section-header">注入选项配置</div>
         
         <div id="injectOptionsContainer">
             ${CHANNEL_OPTIONS.map(
-				(channel) => `
+    (channel) => `
                 <ui-section id="${channel}-section" header="${channel} 配置" style="display: none;">
                     <ui-prop>
                         <ui-label slot="label" value="head"></ui-label>
@@ -188,7 +192,7 @@ export const TEMPLATE = `
                     </ui-prop>
                 </ui-section>
             `
-			).join('')}
+).join('')}
         </div>
         <ui-prop>
             <ui-label slot="label" value="HTML标题"></ui-label>
@@ -199,44 +203,47 @@ export const TEMPLATE = `
 `;
 
 export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
-	root: '#adapter-panel',
-	// 基本配置选择器
-	fileName: '#fileName',
-	title: '#title',
-	iosUrl: '#iosUrl',
-	androidUrl: '#androidUrl',
-	buildPlatform: '#buildPlatform',
-	orientation: '#orientation',
-	tinify: '#tinify',
-	tinifyApiKey: '#tinifyApiKey',
-	enableSplash: '#enableSplash',
-	skipBuild: '#skipBuild',
-	isZip: '#isZip',
-	lang: '#lang',
+    root: '#adapter-panel',
+    // 基本配置选择器
+    fileName: '#fileName',
+    title: '#title',
+    iosUrl: '#iosUrl',
+    androidUrl: '#androidUrl',
+    buildPlatform: '#buildPlatform',
+    orientation: '#orientation',
+    tinify: '#tinify',
+    tinifyApiKey: '#tinifyApiKey',
+    enableSplash: '#enableSplash',
+    skipBuild: '#skipBuild',
+    isZip: '#isZip',
+    lang: '#lang',
+    storePath: '#storePath',
 
-	// DOM_IDS 中的选择器
-	[IDS.CONFIG_BUTTONS]: `#${IDS.CONFIG_BUTTONS}`,
-	[IDS.CREATE_BUTTONS]: `#${IDS.CREATE_BUTTONS}`,
-	[IDS.NO_CONFIG_TIP]: `#${IDS.NO_CONFIG_TIP}`,
-	[IDS.CONFIG_PANEL]: `#${IDS.CONFIG_PANEL}`,
-	[IDS.OPEN_CONFIG]: `#${IDS.OPEN_CONFIG}`,
-	[IDS.IMPORT_CONFIG]: `#${IDS.IMPORT_CONFIG}`,
-	[IDS.EXPORT_CONFIG]: `#${IDS.EXPORT_CONFIG}`,
-	[IDS.IMPORT_CONFIG_CREATE]: `#${IDS.IMPORT_CONFIG_CREATE}`,
-	[IDS.CREATE_CONFIG]: `#${IDS.CREATE_CONFIG}`,
-	[IDS.BUILD]: `#${IDS.BUILD}`,
-	[IDS.BUILDING_MASK]: `#${IDS.BUILDING_MASK}`,
+    // DOM_IDS 中的选择器
+    [IDS.CONFIG_BUTTONS]: `#${IDS.CONFIG_BUTTONS}`,
+    [IDS.CREATE_BUTTONS]: `#${IDS.CREATE_BUTTONS}`,
+    [IDS.NO_CONFIG_TIP]: `#${IDS.NO_CONFIG_TIP}`,
+    [IDS.CONFIG_PANEL]: `#${IDS.CONFIG_PANEL}`,
+    [IDS.OPEN_CONFIG]: `#${IDS.OPEN_CONFIG}`,
+    [IDS.IMPORT_CONFIG]: `#${IDS.IMPORT_CONFIG}`,
+    [IDS.EXPORT_CONFIG]: `#${IDS.EXPORT_CONFIG}`,
+    [IDS.IMPORT_CONFIG_CREATE]: `#${IDS.IMPORT_CONFIG_CREATE}`,
+    [IDS.CREATE_CONFIG]: `#${IDS.CREATE_CONFIG}`,
+    [IDS.BUILD]: `#${IDS.BUILD}`,
+    [IDS.BUILDING_MASK]: `#${IDS.BUILDING_MASK}`,
+    [IDS.STORE_CONTAINER]: `#${IDS.STORE_CONTAINER}`,
 
-	// 渠道相关选择器
-	...CHANNEL_OPTIONS.reduce(
-		(acc, channel) => ({
-			...acc,
-			[channel]: `#${channel}`,
-			[`${channel}-section`]: `#${channel}-section`,
-			[`${channel}-head`]: `#${channel}-head`,
-			[`${channel}-body`]: `#${channel}-body`,
-			[`${channel}-sdkScript`]: `#${channel}-sdkScript`
-		}),
-		{}
-	)
+
+    // 渠道相关选择器
+    ...CHANNEL_OPTIONS.reduce(
+        (acc, channel) => ({
+            ...acc,
+            [channel]: `#${channel}`,
+            [`${channel}-section`]: `#${channel}-section`,
+            [`${channel}-head`]: `#${channel}-head`,
+            [`${channel}-body`]: `#${channel}-body`,
+            [`${channel}-sdkScript`]: `#${channel}-sdkScript`
+        }),
+        {}
+    )
 };

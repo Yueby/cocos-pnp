@@ -4,5 +4,4 @@
 
 /// <reference path="@cocos/creator-types/editor/packages/builder/@types/public/global.d.ts"/>
 export * from '@cocos/creator-types/editor/packages/builder/@types/public';
-export { Checkbox, Input, Select };
 
