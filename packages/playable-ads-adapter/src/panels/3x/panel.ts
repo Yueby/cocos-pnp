@@ -8,7 +8,6 @@ import { ADAPTER_RC_PATH } from '../../extensions/constants';
 import { readAdapterRCFileForPanel } from '../../extensions/utils/file-system/adapterrc';
 import { CHANNEL_OPTIONS, CONFIG, EVENT_TYPES, IDS, SELECTORS, STYLE, TEMPLATE } from './config';
 import { HTMLCustomElement, ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCustomPanelElements, TStoreConfig } from './types';
-import { delay } from "@/extensions/utils";
 
 let panel: ICustomPanelThis;
 let unsubscribeBuildState: (() => void) | null = null;
@@ -345,13 +344,8 @@ function removeEmptyValues(obj: any): any {
 	}
 
 	if (Array.isArray(obj)) {
-		const filteredArray = obj.filter(item =>
-			item !== null &&
-			item !== undefined &&
-			item !== '' &&
-			item !== 'undefined'
-		);
-		return filteredArray.length > 0 ? filteredArray.map(item => removeEmptyValues(item)) : undefined;
+		const filteredArray = obj.filter((item) => item !== null && item !== undefined && item !== '' && item !== 'undefined');
+		return filteredArray.length > 0 ? filteredArray.map((item) => removeEmptyValues(item)) : undefined;
 	}
 
 	if (typeof obj === 'object') {
@@ -386,7 +380,7 @@ async function saveConfigToFile(config: TAdapterRC) {
 	const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
 	try {
-
+		config = removeEmptyValues(config);
 		// 转换为JSON字符串
 		const configStr = JSON.stringify(config, null, 2);
 
@@ -529,14 +523,14 @@ async function handleFileOperation(operation: 'import' | 'export'): Promise<void
 function getDialogConfig(operation: 'import' | 'export') {
 	return operation === 'import'
 		? {
-			title: '选择配置文件',
-			type: 'file' as const,
-			filters: [{ name: 'JSON', extensions: ['json'] }]
-		}
+				title: '选择配置文件',
+				type: 'file' as const,
+				filters: [{ name: 'JSON', extensions: ['json'] }]
+		  }
 		: {
-			title: '选择导出目录',
-			type: 'directory' as const
-		};
+				title: '选择导出目录',
+				type: 'directory' as const
+		  };
 }
 
 async function processFileOperation(operation: 'import' | 'export', filePath: string) {
@@ -567,8 +561,8 @@ async function handleImport(filePath: string) {
 		}
 
 		// 获取目标路径
-		const projectPath = Editor.Project.path;
-		const targetPath = `${projectPath}${ADAPTER_RC_PATH}`;
+		// const projectPath = Editor.Project.path;
+		// const targetPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
 		applyConfig(config);
 	} catch (err: any) {
@@ -580,10 +574,10 @@ async function handleExport(dirPath: string) {
 	try {
 		const config = getOptions();
 		const exportPath = `${dirPath}${ADAPTER_RC_PATH}`;
-		
+
 		// 转换为JSON字符串
 		const configStr = JSON.stringify(config, null, 2);
-		
+
 		// 完整替换文件内容
 		await promises.writeFile(exportPath, configStr, { encoding: 'utf8', flag: 'w' });
 		console.log(`配置已导出到 ${exportPath}`);
@@ -692,7 +686,7 @@ function createStoreSection(storeConfig: TStoreConfig) {
 	}
 
 	// 清除除了 ui-file 以外的所有内容
-	Array.from(container.children).forEach(child => {
+	Array.from(container.children).forEach((child) => {
 		if (child !== storePathElement && child.id !== 'storePath') {
 			container.removeChild(child);
 		}
@@ -705,7 +699,7 @@ function createStoreSection(storeConfig: TStoreConfig) {
 	}
 
 	try {
-		storeConfig.forEach(store => {
+		storeConfig.forEach((store) => {
 			if (!store || typeof store !== 'object') {
 				console.warn('无效的商店配置项:', store);
 				return;
@@ -765,4 +759,3 @@ function createStoreSection(storeConfig: TStoreConfig) {
 		console.error('创建商店配置区域时出错:', err);
 	}
 }
-
