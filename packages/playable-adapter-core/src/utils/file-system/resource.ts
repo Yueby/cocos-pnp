@@ -1,9 +1,9 @@
-import { readdirSync, statSync } from "fs"
-import { lookup } from "mime-types"
-import path, { extname } from "path"
-import { REPLACE_SYMBOL, TO_STRING_EXTNAME, TO_SKIP_EXTNAME, ADAPTER_FETCH } from "@/constants"
-import { getAllFilesFormDir, readToPath, writeToPath } from "./base"
-import { removeXMLHttpRequest } from "../extends"
+import { REPLACE_SYMBOL, REPLACE_SYMBOL_2, TO_SKIP_EXTNAME, TO_STRING_EXTNAME } from "@/constants";
+import { readdirSync, statSync } from "fs";
+import { lookup } from "mime-types";
+import path, { extname } from "path";
+import { removeXMLHttpRequest } from "../extends";
+import { getAllFilesFormDir, readToPath, writeToPath } from "./base";
 
 type TResourceData = { [key: string]: string }
 
@@ -23,18 +23,29 @@ export const getRealPath = (pathStr: string) => {
 }
 
 // Replace global variables.
-export const replaceGlobalSymbol = (dirPath: string, replaceText: string) => {
+export const replaceGlobalSymbol = (dirPath: string, replaceText: string, langText?: string) => {
   const fileList = readdirSync(dirPath)
   fileList.forEach((file) => {
     const absPath = path.join(dirPath, file)
     const statInfo = statSync(absPath)
     // If it is a directory, recursively search downward for files.
     if (statInfo.isDirectory()) {
-      replaceGlobalSymbol(absPath, replaceText)
+      replaceGlobalSymbol(absPath, replaceText, langText)
     } else if (statInfo.isFile() && path.extname(file) === '.js') {
       let dataStr = readToPath(absPath, 'utf-8')
+      let hasChanges = false
+      
       if (dataStr.indexOf(REPLACE_SYMBOL) !== -1) {
         dataStr = dataStr.replaceAll(REPLACE_SYMBOL, replaceText)
+        hasChanges = true
+      }
+      
+      if (langText && dataStr.indexOf(REPLACE_SYMBOL_2) !== -1) {
+        dataStr = dataStr.replaceAll(REPLACE_SYMBOL_2, langText)
+        hasChanges = true
+      }
+      
+      if (hasChanges) {
         writeToPath(absPath, dataStr)
       }
     }
@@ -78,8 +89,9 @@ export const getResourceMapper = async (options: {
   mountCbFn?: (objKey: string, data: string) => string // single file mount callback function
   unmountCbFn?: (objKey: string, data: string) => void // single file unmount callback function
   rmHttp?: boolean
+  lang?: string // Add language parameter
 }) => {
-  const { dirPath, rmHttp = false, unmountCbFn, mountCbFn, skipFiles = [] } = options
+  const { dirPath, rmHttp = false, unmountCbFn, mountCbFn, skipFiles = [], lang } = options
 
   let resMapper: TResourceData = {}
 
@@ -110,6 +122,11 @@ export const getResourceMapper = async (options: {
 
     if (rmHttp && fileExtname === '.js') {
       data = removeXMLHttpRequest(data)
+    }
+
+    // Replace language placeholder if lang is provided
+    if (lang && data.indexOf(REPLACE_SYMBOL_2) !== -1) {
+      data = data.replaceAll(REPLACE_SYMBOL_2, lang)
     }
 
     resMapper[objKey] = data

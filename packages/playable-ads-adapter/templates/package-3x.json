@@ -6,6 +6,12 @@
   "editor": ">=3.3.0",
   "author": "ppgee & yueby",
   "contributions": {
+    "asset-db": {
+      "mount": {
+        "path": "./assets",
+        "readonly": true
+      }
+    },
     "builder": "./main.js",
     "menu": [
       {

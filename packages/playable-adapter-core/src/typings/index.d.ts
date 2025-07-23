@@ -46,6 +46,7 @@ export type TChannelPkgOptions = {
 	orientation: TWebOrientations;
 	resMapper?: TResourceData;
 	compDiff?: number;
+	lang?: string;
 };
 
 export type TBuilderOptions = {
@@ -53,6 +54,7 @@ export type TBuilderOptions = {
 	transformHTML?: ($: CheerioAPI) => Promise<void>;
 	transform?: (destPath: string) => Promise<void>;
 	fixInitScript?: boolean;
+	lang?: string;
 } & Pick<TChannelPkgOptions, 'resMapper' | 'compDiff'>;
 
 export type TExportType = 'zip' | 'dirZip';

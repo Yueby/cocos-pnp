@@ -1,10 +1,9 @@
-import { join } from 'path';
-import { CheerioAPI, load } from 'cheerio';
-import { getAdapterRCJson, getBase64FromFile, getFileSize, getOriginPkgPath, getResourceMapper, readToPath, writeToPath } from '@/utils';
-import { jszipCode } from '@/helpers/injects';
-import { deflate } from 'pako';
 import { TRANSPARENT_GIF } from '@/constants';
-import { TAdapterRC } from '@/typings';
+import { jszipCode } from '@/helpers/injects';
+import { getAdapterRCJson, getBase64FromFile, getFileSize, getOriginPkgPath, getResourceMapper, readToPath, writeToPath } from '@/utils';
+import { CheerioAPI, load } from 'cheerio';
+import { deflate } from 'pako';
+import { join } from 'path';
 
 type TOptions = {
 	singleFilePath: string;
@@ -129,7 +128,7 @@ const getJsListFromSettingsJs = (data: string): { jsList: string[]; settingsData
 };
 
 const paddingAllResToMapped = async (options: { injectsCode: TOptions['injectsCode']; $: CheerioAPI }) => {
-	const { isZip = true, enableSplash = true } = getAdapterRCJson() || {};
+	const { isZip = true, enableSplash = true, lang } = getAdapterRCJson() || {};
 
 	const { injectsCode, $ } = options;
 	// Original package path
@@ -139,6 +138,7 @@ const paddingAllResToMapped = async (options: { injectsCode: TOptions['injectsCo
 	const { resMapper } = await getResourceMapper({
 		dirPath: originPkgPath,
 		rmHttp: true,
+		lang,
 		mountCbFn: (objKey, data) => {
 			if (objKey.indexOf('src/settings.json') !== -1) {
 				// get jsList in settings.json
@@ -168,16 +168,16 @@ const paddingAllResToMapped = async (options: { injectsCode: TOptions['injectsCo
 		console.info('[压缩] 开始压缩资源包...');
 		const zip = deflate(resStr);
 		const zipStr = Buffer.from(zip).toString('base64');
-		
+
 		const originalSize = resStr.length;
 		const compressedSize = zipStr.length;
 		const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
-		
-		console.info(`[压缩] 资源包大小 - 原始: ${(originalSize/1024).toFixed(2)}kb, 压缩后: ${(compressedSize/1024).toFixed(2)}kb`);
-		
+
+		console.info(`[压缩] 资源包大小 - 原始: ${(originalSize / 1024).toFixed(2)}kb, 压缩后: ${(compressedSize / 1024).toFixed(2)}kb`);
+
 		if (zipStr.length < resStr.length) {
 			compDiff = resStr.length - zipStr.length;
-			console.info(`[压缩] 压缩率: ${ratio}%, 节省空间: ${(compDiff/1024).toFixed(2)}kb`);
+			console.info(`[压缩] 压缩率: ${ratio}%, 节省空间: ${(compDiff / 1024).toFixed(2)}kb`);
 			resStr = zipStr;
 		} else {
 			console.warn('[压缩] 压缩后文件更大,将使用原始资源包');

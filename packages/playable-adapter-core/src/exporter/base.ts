@@ -104,7 +104,7 @@ const restoreScripts = ($: CheerioAPI, payload: { resMapper: TBuilderOptions['re
 const fillCodeToHTML = ($: CheerioAPI, options: TBuilderOptions) => {
 	let { channel, resMapper, compDiff } = options;
 	// Replace global variables.
-	resMapper = globalReplacer({
+	const updatedResMapper = globalReplacer({
 		channel,
 		resMapper: resMapper ? { ...resMapper } : {},
 		$
@@ -112,9 +112,9 @@ const fillCodeToHTML = ($: CheerioAPI, options: TBuilderOptions) => {
 
 	const isCompress = (compDiff ?? 0) > 0;
 	if (isCompress) {
-		compressScripts($, { resMapper });
+		compressScripts($, { resMapper: updatedResMapper });
 	} else {
-		restoreScripts($, { resMapper });
+		restoreScripts($, { resMapper: updatedResMapper });
 	}
 };
 
@@ -251,7 +251,8 @@ export const exportZipFromPkg = async (options: TBuilderOptions) => {
 		await withTempDir(channelPath, async (tempDir) => {
 			// 复制并处理文件
 			copyDirToPath(getOriginPkgPath(), tempDir);
-			replaceGlobalSymbol(tempDir, channel);
+			const { lang } = getAdapterRCJson() || {};
+			replaceGlobalSymbol(tempDir, channel, lang);
 
 			// 处理 HTML
 			const htmlPath = join(tempDir, '/index.html');

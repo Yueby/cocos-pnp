@@ -7,6 +7,7 @@ export const PLAYABLE_DEFAULT_CONFIG: TPlayableConfig = {
 };
 
 export const REPLACE_SYMBOL = '{{__adv_channels_adapter__}}';
+export const REPLACE_SYMBOL_2 = '{{__language_adapter__}}';
 export const ADAPTER_FETCH = 'adapterFetch';
 // every channel's adapter zip file size limit
 export const MAX_ZIP_SIZE = 2 * 1024 * 1024;

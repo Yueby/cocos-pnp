@@ -1,3 +1,4 @@
+import { mountGlobalVars, unmountGlobalVars } from "@/global";
 import { execTinify } from "@/helpers/tinify";
 import { genSingleFile as gen2xSingleFile } from '@/merger/2x';
 import { genSingleFile as gen3xSingleFile } from '@/merger/3x';
@@ -6,7 +7,6 @@ import { genChannelsPkg as gen3xChannelsPkg } from '@/packager/3x';
 import { TMode } from "@/packager/base";
 import { TAdapterRC } from "@/typings";
 import { getAdapterRCJson } from "@/utils";
-import { mountGlobalVars, unmountGlobalVars } from "@/global";
 
 type TOptions = {
   buildFolderPath: string,
@@ -32,14 +32,15 @@ export const exec2xAdapter = async (options: TOptions, config?: { mode: TMode; }
   const { resMapper, compDiff } = await gen2xSingleFile();
   console.info('[合并] 单文件生成完成');
 
-  const { orientation = 'auto' } = getAdapterRCJson() || {};
+  const { orientation = 'auto', lang } = getAdapterRCJson() || {};
   const { mode = 'parallel' } = config ?? { mode: 'parallel' };
 
   console.info('[打包] 开始生成渠道包');
   await gen2xChannelsPkg({
     orientation,
     resMapper,
-    compDiff
+    compDiff,
+    lang
   }, mode);
   console.info('[打包] 渠道包生成完成');
 
@@ -65,14 +66,15 @@ export const exec3xAdapter = async (options: TOptions, config?: { mode: TMode; }
   const { resMapper, compDiff } = await gen3xSingleFile();
   console.info('单文件生成完成');
 
-  const { orientation = 'auto' } = getAdapterRCJson() || {};
+  const { orientation = 'auto', lang } = getAdapterRCJson() || {};
   const { mode = 'parallel' } = config ?? { mode: 'parallel' };
 
   console.info('【生成渠道包】');
   await gen3xChannelsPkg({
     orientation,
     resMapper,
-    compDiff
+    compDiff,
+    lang
   }, mode);
   console.info('渠道包生成完成');
 

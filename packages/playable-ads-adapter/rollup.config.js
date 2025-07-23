@@ -50,7 +50,7 @@ export default {
     copy({
       targets: [
         {
-          src: `assets/package-${builderVersion}.json`,
+          src: `templates/package-${builderVersion}.json`,
           dest: outputDir,
           rename: 'package.json',
           transform: (contents) => {
@@ -59,7 +59,8 @@ export default {
             return JSON.stringify(tempPkgJson, null, 2);
           }
         },
-        { src: 'i18n/**/*', dest: `${outputDir}/i18n` }
+        { src: 'i18n/**/*', dest: `${outputDir}/i18n` },
+        { src: 'assets/**/*', dest: `${outputDir}/assets` }
       ],
       verbose: true
     }),
