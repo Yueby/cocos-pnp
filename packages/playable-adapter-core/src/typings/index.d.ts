@@ -40,7 +40,7 @@ export type TPlayableConfig = {
 	playable_languages: string[];
 };
 
-export type TResourceData = { [key: string]: string };
+export type TResourceData = { [key: string]: string; };
 
 export type TChannelPkgOptions = {
 	orientation: TWebOrientations;
@@ -62,10 +62,11 @@ export type TExportType = 'zip' | 'dirZip';
 export type TZipFromSingleFileOptions = TBuilderOptions & {
 	transformScript?: (scriptNode: Cheerio<Element>) => Promise<void>;
 	exportType?: TExportType;
-	
+	dontExtractJS?: boolean;
+
 };
 
-export type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity';
+export type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity' | 'SnapChat';
 
 export type TChannelRC = {
 	head: string;

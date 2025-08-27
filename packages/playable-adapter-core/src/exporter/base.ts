@@ -12,7 +12,7 @@ import path, { basename, extname, join } from 'path';
 
 const FILE_MAX_SIZE = MAX_ZIP_SIZE * 0.8;
 
-const globalReplacer = (options: Pick<TBuilderOptions, 'channel' | 'resMapper'> & { $: CheerioAPI }) => {
+const globalReplacer = (options: Pick<TBuilderOptions, 'channel' | 'resMapper'> & { $: CheerioAPI; }) => {
 	const { channel, resMapper } = options;
 	if (!resMapper) {
 		return {} as TResourceData;
@@ -26,7 +26,7 @@ const globalReplacer = (options: Pick<TBuilderOptions, 'channel' | 'resMapper'> 
 	return resMapper;
 };
 
-const compressScripts = ($: CheerioAPI, payload: { resMapper: TBuilderOptions['resMapper'] }) => {
+const compressScripts = ($: CheerioAPI, payload: { resMapper: TBuilderOptions['resMapper']; }) => {
 	const { resMapper } = payload;
 
 	// Add compressed files.
@@ -48,7 +48,7 @@ const compressScripts = ($: CheerioAPI, payload: { resMapper: TBuilderOptions['r
 	$(`<script data-id="jszip">${jszipCode}</script>`).appendTo('body');
 };
 
-const restoreScripts = ($: CheerioAPI, payload: { resMapper: TBuilderOptions['resMapper'] }) => {
+const restoreScripts = ($: CheerioAPI, payload: { resMapper: TBuilderOptions['resMapper']; }) => {
 	const appendScript = (content: TResourceData, index: number) => {
 		const str = JSON.stringify(content);
 		const scriptTag = `<script data-id="adapter-resource-${index}">Object.assign(window.__adapter_resource__, ${str});</script>`;
@@ -301,7 +301,9 @@ export const exportZipFromSingleFile = async (singleFilePath: string, options: T
 			writeToPath(htmlPath, $.html());
 
 			// 处理脚本（将脚本内容移到单独文件）
-			await processScripts($, tempDir, transformScript, exportType === 'dirZip');
+			if (!options.dontExtractJS) {
+				await processScripts($, tempDir, transformScript, exportType === 'dirZip');
+			}
 
 			// 再次写入 HTML，确保脚本标签更新
 			writeToPath(htmlPath, $.html());

@@ -1,6 +1,6 @@
 import { TAdapterRCKeysExcluded, TPanelSelector } from './types';
 
-export const CHANNEL_OPTIONS: TChannel[] = ['AppLovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'Mintegral', 'Moloco', 'Pangle', 'Rubeex', 'Tiktok', 'Unity'];
+export const CHANNEL_OPTIONS: TChannel[] = ['AppLovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'Mintegral', 'Moloco', 'Pangle', 'Rubeex', 'SnapChat', 'Tiktok', 'Unity'];
 export const ORIENTATIONS: TWebOrientations[] = ['auto', 'portrait', 'landscape'];
 
 // 配置常量
