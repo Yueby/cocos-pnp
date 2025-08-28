@@ -6,6 +6,7 @@ import { existsSync, promises } from 'fs';
 import { buildState } from '../../extensions/builder/3x';
 import { ADAPTER_RC_PATH } from '../../extensions/constants';
 import { readAdapterRCFileForPanel } from '../../extensions/utils/file-system/adapterrc';
+import { logger } from '../utils/logger';
 import { CHANNEL_OPTIONS, CONFIG, EVENT_TYPES, IDS, SELECTORS, STYLE, TEMPLATE } from './config';
 import { HTMLCustomElement, ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCustomPanelElements, TStoreConfig } from './types';
 
@@ -23,17 +24,17 @@ function initBuildStateListener() {
 	unsubscribeBuildState = buildState.subscribe(({ building, error }) => {
 		const mask = panel.$[IDS.BUILDING_MASK];
 		if (!mask) {
-			console.error('找不到构建遮罩层元素');
+			logger.error('找不到构建遮罩层元素');
 			return;
 		}
 
 		if (building) {
 			mask.classList.add('active');
-			console.log('构建中...');
+			logger.log('构建中...');
 		} else {
 			mask.classList.remove('active');
 			if (error) {
-				console.error('构建失败:', error);
+				logger.error('构建失败:', error);
 			}
 		}
 	});
@@ -66,7 +67,7 @@ async function initStoreConfig(config: TAdapterRC) {
 		const storeConfig = await readStoreConfig(config.storePath);
 		createStoreSection(storeConfig);
 	} catch (err) {
-		console.error('初始化商店配置失败:', err);
+		logger.error('初始化商店配置失败:', err);
 	}
 }
 
@@ -80,7 +81,7 @@ async function initPanelConfig(config: TAdapterRC) {
 		init();
 		await initStoreConfig(config);
 	} catch (err) {
-		console.error('初始化面板配置失败:', err);
+		logger.error('初始化面板配置失败:', err);
 	}
 }
 
@@ -94,6 +95,23 @@ export async function ready(options: ITaskOptions) {
 		// 初始化构建状态监听器
 		initBuildStateListener();
 
+		// 监听语言更新消息
+		Editor.Message.addBroadcastListener('update-panel-language', (lang: string) => {
+
+			const config = getOptions();
+			config.lang = lang;
+
+			// 更新UI显示
+			const langInput = panel.$['lang'];
+			if (langInput) {
+				langInput.value = lang;
+			}
+
+			// 保存配置
+			setOptions(config);
+			logger.log('面板语言已更新为:', lang);
+		});
+
 		// 读取配置文件
 		const config = readAdapterRCFileForPanel();
 
@@ -105,7 +123,7 @@ export async function ready(options: ITaskOptions) {
 			await initPanelConfig(config);
 		}
 	} catch (err) {
-		console.error('面板初始化失败:', err);
+		logger.error('面板初始化失败:', err);
 	}
 }
 
@@ -125,7 +143,7 @@ export async function update(options: ITaskOptions, key: string) {
 		// 然后保存到文件
 		await saveConfigToFile(config);
 	} catch (err: any) {
-		console.error('更新配置失败:', err.message);
+		logger.error('更新配置失败:', err.message);
 	}
 
 	if (!key) {
@@ -157,7 +175,7 @@ export function close() {
 		// 清空面板的 $ 对象
 		panel.$ = {} as TCustomPanelElements;
 	} catch (err) {
-		console.error('关闭面板时出错:', err);
+		logger.error('关闭面板时出错:', err);
 	}
 }
 
@@ -226,7 +244,7 @@ function initBaseConfig() {
 					const storeConfig = await readStoreConfig(path);
 					createStoreSection(storeConfig);
 				} catch (err) {
-					console.error('处理商店配置失败:', err);
+					logger.error('处理商店配置失败:', err);
 				}
 			} else {
 				// 如果路径为空，清空商店配置区域
@@ -389,9 +407,9 @@ async function saveConfigToFile(config: TAdapterRC) {
 
 		// 完整替换文件内容
 		await promises.writeFile(configPath, configStr, { encoding: 'utf8', flag: 'w' });
-		console.log(`配置已保存到 ${configPath}`);
+		logger.log(`配置已保存到 ${configPath}`);
 	} catch (err) {
-		console.error('保存配置失败:', err);
+		logger.error('保存配置失败:', err);
 		throw new Error('配置格式无效，无法保存');
 	}
 }
@@ -465,7 +483,7 @@ function applyConfig(config: TAdapterRC) {
 
 		return true;
 	} catch (err: any) {
-		console.error(`${err.message}`);
+		logger.error(`${err.message}`);
 		return false;
 	}
 }
@@ -482,9 +500,9 @@ const handleCreateConfigClick = async () => {
 
 		// 完整替换文件内容
 		await promises.writeFile(configPath, JSON.stringify(defaultConfig, null, 2), { encoding: 'utf8', flag: 'w' });
-		console.log('成功创建并保存默认配置');
+		logger.log('成功创建并保存默认配置');
 	} catch (err: any) {
-		console.error('创建配置文件失败:', err.message);
+		logger.error('创建配置文件失败:', err.message);
 	}
 };
 
@@ -514,23 +532,23 @@ async function handleFileOperation(operation: 'import' | 'export'): Promise<void
 
 	try {
 		await processFileOperation(operation, result.filePaths[0]);
-		console.log(`配置已成功${operation === 'import' ? '导入' : '导出'}`);
+		logger.log(`配置已成功${operation === 'import' ? '导入' : '导出'}`);
 	} catch (err: any) {
-		console.error(`配置${operation === 'import' ? '导入' : '导出'}失败: ${err.message}`);
+		logger.error(`配置${operation === 'import' ? '导入' : '导出'}失败: ${err.message}`);
 	}
 }
 
 function getDialogConfig(operation: 'import' | 'export') {
 	return operation === 'import'
 		? {
-				title: '选择配置文件',
-				type: 'file' as const,
-				filters: [{ name: 'JSON', extensions: ['json'] }]
-		  }
+			title: '选择配置文件',
+			type: 'file' as const,
+			filters: [{ name: 'JSON', extensions: ['json'] }]
+		}
 		: {
-				title: '选择导出目录',
-				type: 'directory' as const
-		  };
+			title: '选择导出目录',
+			type: 'directory' as const
+		};
 }
 
 async function processFileOperation(operation: 'import' | 'export', filePath: string) {
@@ -545,7 +563,7 @@ async function handleImport(filePath: string) {
 	try {
 		// 检查源文件是否存在
 		if (!existsSync(filePath)) {
-			console.error(`源文件不存在: ${filePath}`);
+			logger.error(`源文件不存在: ${filePath}`);
 			return;
 		}
 
@@ -556,7 +574,7 @@ async function handleImport(filePath: string) {
 		try {
 			config = JSON.parse(content);
 		} catch (err) {
-			console.error('配置文件格式无效，请确保是有效的 JSON 格式');
+			logger.error('配置文件格式无效，请确保是有效的 JSON 格式');
 			return;
 		}
 
@@ -566,7 +584,7 @@ async function handleImport(filePath: string) {
 
 		applyConfig(config);
 	} catch (err: any) {
-		console.error(`导入配置失败: ${err.message}`);
+		logger.error(`导入配置失败: ${err.message}`);
 	}
 }
 
@@ -580,9 +598,9 @@ async function handleExport(dirPath: string) {
 
 		// 完整替换文件内容
 		await promises.writeFile(exportPath, configStr, { encoding: 'utf8', flag: 'w' });
-		console.log(`配置已导出到 ${exportPath}`);
+		logger.log(`配置已导出到 ${exportPath}`);
 	} catch (err: any) {
-		console.error(`导出配置失败: ${err.message}`);
+		logger.error(`导出配置失败: ${err.message}`);
 	}
 }
 
@@ -637,12 +655,12 @@ async function handleOpenConfig() {
 		if (existsSync(configPath)) {
 			// 使用系统默认程序打开文件
 			await shell.openPath(configPath);
-			console.log(`使用系统默认程序打开配置文件: ${configPath}`);
+			logger.log(`使用系统默认程序打开配置文件: ${configPath}`);
 		} else {
-			console.warn(`配置文件不存在: ${configPath}`);
+			logger.warn(`配置文件不存在: ${configPath}`);
 		}
 	} catch (err: any) {
-		console.error(`打开配置文件失败: ${err.message}`);
+		logger.error(`打开配置文件失败: ${err.message}`);
 	}
 }
 
@@ -654,7 +672,7 @@ function getStyle(selector: string): CSSStyleDeclaration {
 	try {
 		return element.style;
 	} catch (err) {
-		console.error(`获取样式失败: ${selector}`, err);
+		logger.error(`获取样式失败: ${selector}`, err);
 		return element.style;
 	}
 }
@@ -665,7 +683,7 @@ async function readStoreConfig(storePath: string): Promise<TStoreConfig> {
 		const content = await promises.readFile(storePath, 'utf8');
 		return JSON.parse(content);
 	} catch (err) {
-		console.error('读取商店配置失败:', err);
+		logger.error('读取商店配置失败:', err);
 		return [];
 	}
 }
@@ -674,14 +692,14 @@ async function readStoreConfig(storePath: string): Promise<TStoreConfig> {
 function createStoreSection(storeConfig: TStoreConfig) {
 	const container = panel.$[IDS.STORE_CONTAINER];
 	if (!container || !(container instanceof HTMLElement)) {
-		console.error('商店配置容器无效或不是 HTMLElement');
+		logger.error('商店配置容器无效或不是 HTMLElement');
 		return;
 	}
 
 	// 获取 ui-file 元素
 	const storePathElement = panel.$['storePath'];
 	if (!storePathElement || !(storePathElement instanceof HTMLElement)) {
-		console.error('商店配置路径输入框无效或不是 HTMLElement');
+		logger.error('商店配置路径输入框无效或不是 HTMLElement');
 		return;
 	}
 
@@ -694,14 +712,14 @@ function createStoreSection(storeConfig: TStoreConfig) {
 
 	// 如果没有配置，直接返回
 	if (!Array.isArray(storeConfig) || storeConfig.length === 0) {
-		console.log('没有商店配置数据');
+		logger.log('没有商店配置数据');
 		return;
 	}
 
 	try {
 		storeConfig.forEach((store) => {
 			if (!store || typeof store !== 'object') {
-				console.warn('无效的商店配置项:', store);
+				logger.warn('无效的商店配置项:', store);
 				return;
 			}
 
@@ -756,6 +774,6 @@ function createStoreSection(storeConfig: TStoreConfig) {
 			container.appendChild(storeSection);
 		});
 	} catch (err) {
-		console.error('创建商店配置区域时出错:', err);
+		logger.error('创建商店配置区域时出错:', err);
 	}
 }

@@ -25,6 +25,11 @@
         "methods": [
           "builder3x"
         ]
+      },
+      "update-language": {
+        "methods": [
+          "updateLanguage"
+        ]
       }
     }
   }
