@@ -32,7 +32,11 @@ export class Playable {
 	}
 
 	public static showAds(): void {
-		// @ts-ignore
-		showAds();
+		try {
+			// @ts-ignore
+			showAds();
+		} catch (error) {
+			console.error(error);
+		}
 	}
 }

@@ -48,7 +48,7 @@ const runBuilder = (buildPlatform: TPlatform) => {
 
 export const initBuildStartEvent = async (options: Partial<IBuildTaskOption>) => {
 	console.log(`${BUILDER_NAME} 进行预构建处理`);
-	console.log(`${BUILDER_NAME} 跳过预构建处理`);
+	// console.log(`${BUILDER_NAME} 跳过预构建处理`);
 };
 
 export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
@@ -56,6 +56,10 @@ export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
 		const { projectRootPath, projectBuildPath, adapterBuildConfig } = getAdapterConfig();
 
 		// console.log(adapterBuildConfig?.fileName);
+		if(options.platform !== adapterBuildConfig?.buildPlatform){
+			console.warn('构建平台不匹配，跳过适配');
+			return;
+		}
 
 		const buildFolderPath = join(projectRootPath, projectBuildPath);
 
