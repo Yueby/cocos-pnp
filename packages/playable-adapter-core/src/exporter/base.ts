@@ -345,8 +345,14 @@ export const createZip = async (destPath: string, filePaths: string[], zipName: 
 				readFile(zip, filePath, basename(filePath), false);
 			}
 		}
-		// 生成 zip 文件的内容
-		const zipContent = await zip!.generateAsync({ type: 'nodebuffer' });
+		// 生成 zip 文件的内容（使用 DEFLATE 压缩）
+		const zipContent = await zip!.generateAsync({ 
+			type: 'nodebuffer',
+			compression: 'DEFLATE',
+			compressionOptions: {
+				level: 5 // 平衡压缩级别 (1-9)
+			}
+		});
 
 		// 将 zip 内容写入到文件中
 		let file_path = path.join(destPath, `${zipName}.zip`);

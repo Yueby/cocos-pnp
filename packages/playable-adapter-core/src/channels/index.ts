@@ -10,4 +10,5 @@ export * from './rubeex';
 export * from './snapchat';
 export * from './tiktok';
 export * from './unity';
+export * from './yandex';
 

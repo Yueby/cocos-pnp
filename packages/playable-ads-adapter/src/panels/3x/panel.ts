@@ -7,7 +7,7 @@ import { buildState } from '../../extensions/builder/3x';
 import { ADAPTER_RC_PATH } from '../../extensions/constants';
 import { readAdapterRCFileForPanel } from '../../extensions/utils/file-system/adapterrc';
 import { logger } from '../utils/logger';
-import { CHANNEL_OPTIONS, CONFIG, EVENT_TYPES, IDS, SELECTORS, STYLE, TEMPLATE } from './config';
+import { CHANNEL_OPTIONS, CHANNEL_TIPS, CONFIG, DEFAULT_TIP, EVENT_TYPES, IDS, SELECTORS, STYLE, TEMPLATE } from './config';
 import { HTMLCustomElement, ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCustomPanelElements, TStoreConfig } from './types';
 
 let panel: ICustomPanelThis;
@@ -316,12 +316,16 @@ function onChannelClick(event: any) {
 
 	// 更新注入选项区域
 	updateInjectOptions();
+	// 更新渠道提示
+	updateChannelTips();
 }
 
 function init() {
 	initBaseConfig();
 	initChannels();
 	updateInjectOptions();
+	updateDefaultTip();
+	updateChannelTips();
 }
 
 function updateInjectOptions() {
@@ -347,6 +351,137 @@ function updateInjectOptions() {
 			headInput.value = channelConfig.head || '';
 			bodyInput.value = channelConfig.body || '';
 			sdkScriptInput.value = channelConfig.sdkScript || '';
+		}
+	});
+}
+
+function updateDefaultTip() {
+	const defaultTipContainer = panel.$['defaultTipContainer'];
+	
+	if (!defaultTipContainer || !(defaultTipContainer instanceof HTMLElement)) {
+		return;
+	}
+	
+	defaultTipContainer.innerHTML = '';
+	
+	const level = DEFAULT_TIP.level || 'info';
+	const levelColors: Record<string, string> = {
+		warn: '#faad14',
+		error: '#ff4d4f'
+	};
+	
+	const section = document.createElement('ui-section');
+	section.setAttribute('header', '提示');
+	section.setAttribute('expand', '');
+	
+	if (level !== 'info' && levelColors[level]) {
+		const wrapper = document.createElement('div');
+		wrapper.style.borderLeft = `3px solid ${levelColors[level]}`;
+		wrapper.style.paddingLeft = '4px';
+		wrapper.style.marginLeft = '-4px';
+		wrapper.className = 'tip-section';
+		wrapper.setAttribute('data-level', level);
+		
+		const prop = document.createElement('ui-prop');
+		const label = document.createElement('ui-label');
+		
+		const textNode = document.createTextNode(DEFAULT_TIP.message);
+		label.appendChild(textNode);
+		
+		if (DEFAULT_TIP.link) {
+			const link = document.createElement('ui-link');
+			link.setAttribute('tooltip', DEFAULT_TIP.linkText || '查看');
+			link.setAttribute('value', DEFAULT_TIP.link);
+			const icon = document.createElement('ui-icon');
+			icon.setAttribute('value', 'help');
+			link.appendChild(icon);
+			label.appendChild(link);
+		}
+		
+		prop.appendChild(label);
+		section.appendChild(prop);
+		wrapper.appendChild(section);
+		defaultTipContainer.appendChild(wrapper);
+	} else {
+		const prop = document.createElement('ui-prop');
+		const label = document.createElement('ui-label');
+		
+		const textNode = document.createTextNode(DEFAULT_TIP.message);
+		label.appendChild(textNode);
+		
+		if (DEFAULT_TIP.link) {
+			const link = document.createElement('ui-link');
+			link.setAttribute('tooltip', DEFAULT_TIP.linkText || '查看');
+			link.setAttribute('value', DEFAULT_TIP.link);
+			const icon = document.createElement('ui-icon');
+			icon.setAttribute('value', 'help');
+			link.appendChild(icon);
+			label.appendChild(link);
+		}
+		
+		prop.appendChild(label);
+		section.appendChild(prop);
+		defaultTipContainer.appendChild(section);
+	}
+}
+
+function updateChannelTips() {
+	const config = getOptions();
+	const selectedChannels = config.exportChannels || [];
+	const tipsContainer = panel.$['channelTipsContainer'];
+	
+	if (!tipsContainer || !(tipsContainer instanceof HTMLElement)) {
+		return;
+	}
+	
+	tipsContainer.innerHTML = '';
+	
+	selectedChannels.forEach((channel) => {
+		const tip = CHANNEL_TIPS[channel];
+		if (!tip) {
+			return;
+		}
+		
+		const level = tip.level || 'info';
+		const levelColors: Record<string, string> = {
+			warn: '#faad14',
+			error: '#ff4d4f'
+		};
+		
+		const section = document.createElement('ui-section');
+		section.setAttribute('header', `${channel} 提示`);
+		section.setAttribute('expand', '');
+		
+		const prop = document.createElement('ui-prop');
+		const label = document.createElement('ui-label');
+		
+		const textNode = document.createTextNode(tip.message);
+		label.appendChild(textNode);
+		
+		if (tip.link) {
+			const link = document.createElement('ui-link');
+			link.setAttribute('tooltip', tip.linkText || '查看详情');
+			link.setAttribute('value', tip.link);
+			const icon = document.createElement('ui-icon');
+			icon.setAttribute('value', 'help');
+			link.appendChild(icon);
+			label.appendChild(link);
+		}
+		
+		prop.appendChild(label);
+		section.appendChild(prop);
+		
+		if (level !== 'info' && levelColors[level]) {
+			const wrapper = document.createElement('div');
+			wrapper.style.borderLeft = `3px solid ${levelColors[level]}`;
+			wrapper.style.paddingLeft = '4px';
+			wrapper.style.marginLeft = '-4px';
+			wrapper.className = 'tip-section';
+			wrapper.setAttribute('data-level', level);
+			wrapper.appendChild(section);
+			tipsContainer.appendChild(wrapper);
+		} else {
+			tipsContainer.appendChild(section);
 		}
 	});
 }
@@ -605,6 +740,7 @@ async function handleExport(dirPath: string) {
 }
 
 // 定义事件处理函数
+const handleOpenBuildFolderClick = () => handleOpenBuildFolder();
 const handleOpenConfigClick = () => handleOpenConfig();
 const handleImportClick = () => handleFileOperation('import');
 const handleExportClick = () => handleFileOperation('export');
@@ -613,6 +749,7 @@ const handleBuildClick = () => handleBuild();
 function initConfigPanelButtons() {
 	// 由于 initPanelElements 已确保所有元素都不为空，可以直接添加事件监听器
 	// 配置面板上的按钮
+	panel.$[IDS.OPEN_BUILD_FOLDER].addEventListener(EVENT_TYPES.CLICK, handleOpenBuildFolderClick);
 	panel.$[IDS.OPEN_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleOpenConfigClick);
 	panel.$[IDS.IMPORT_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleImportClick);
 	panel.$[IDS.EXPORT_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleExportClick);
@@ -641,6 +778,26 @@ function handleBuild() {
 		return;
 	}
 	Editor.Message.send(PACKAGE_NAME, 'adapter-build');
+}
+
+/**
+ * 打开构建文件夹
+ */
+async function handleOpenBuildFolder() {
+	try {
+		const projectPath = Editor.Project.path;
+		const buildPath = `${projectPath}/build`;
+
+		// 检查文件夹是否存在
+		if (existsSync(buildPath)) {
+			await shell.openPath(buildPath);
+			logger.log(`打开构建文件夹: ${buildPath}`);
+		} else {
+			logger.warn(`构建文件夹不存在: ${buildPath}，请先执行构建`);
+		}
+	} catch (err: any) {
+		logger.error(`打开构建文件夹失败: ${err.message}`);
+	}
 }
 
 /**

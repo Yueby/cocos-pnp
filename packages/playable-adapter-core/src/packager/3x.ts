@@ -11,6 +11,7 @@ import {
   export3xSnapChat,
   export3xTiktok,
   export3xUnity,
+  export3xYandex,
 } from '@/channels';
 import {
   TChannel,
@@ -31,6 +32,7 @@ const channelExports: { [key in TChannel]: (options: TChannelPkgOptions) => Prom
   SnapChat: export3xSnapChat,
   Tiktok: export3xTiktok,
   Unity: export3xUnity,
+  Yandex: export3xYandex,
 }
 
 export const genChannelsPkg = (options: TChannelPkgOptions, mode?: TMode): Promise<void> => {

@@ -32,10 +32,10 @@ Cocos广告试玩多渠道导出插件
 
 ### 支持渠道
 
-|              | AppLovin | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | Tiktok | Unity |
-| ------------ | -------- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | ------ | ----- |
-| **>= 2.4.6** | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅     | ✅    |
-| **3.8.x**    | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅     | ✅    |
+|              | AppLovin | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | SnapChat | Tiktok | Unity | Yandex |
+| ------------ | -------- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | -------- | ------ | ----- | ------ |
+| **>= 2.4.6** | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅       | ✅     | ✅    | ✅     |
+| **3.8.x**    | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅       | ✅     | ✅    | ✅     |
 
 ### 额外支持功能
 
@@ -62,8 +62,10 @@ type TChannel =
   | 'Moloco'
   | 'Pangle'
   | 'Rubeex'
+  | 'SnapChat'
   | 'Tiktok'
   | 'Unity'
+  | 'Yandex'
 
 type TPlatform =
   | 'web-desktop'

@@ -12,7 +12,9 @@ export const Channels = {
 	Pangle: 'Pangle',
 	Rubeex: 'Rubeex',
 	Tiktok: 'Tiktok',
-	Unity: 'Unity'
+	Unity: 'Unity',
+	SnapChat: 'SnapChat',
+	Yandex: 'Yandex'
 };
 
 // @ts-ignore
@@ -31,12 +33,24 @@ export class Playable {
 		return window.language;
 	}
 
-	public static showAds(): void {
+	public static isChannel(channel: string): boolean {
+		return this.channel === channel;
+	}
+
+	public static showAds(onSuccess?: () => void, onError?: () => void): void {
 		try {
 			// @ts-ignore
+			if (typeof showAds !== 'function') {
+				console.warn('Ads not supported in current environment');
+				onError?.();
+				return;
+			}
+			// @ts-ignore
 			showAds();
+			onSuccess?.();
 		} catch (error) {
 			console.error(error);
+			onError?.();
 		}
 	}
 }

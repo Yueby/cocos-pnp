@@ -1,4 +1,4 @@
-import { AD_SDK_SCRIPT } from './inject-vars'
+import { MRAID_SCRIPT, MRAID_INIT_SCRIPT } from './inject-vars'
 import { exportSingleFile } from "@/exporter/2x"
 import { getChannelRCSdkScript } from '@/utils'
 import { TChannel, TChannelPkgOptions } from "@/typings"
@@ -9,10 +9,10 @@ export const export2xIronSource = async (options: TChannelPkgOptions) => {
     ...options,
     channel,
     transformHTML: async ($) => {
-      const sdkInjectScript = getChannelRCSdkScript(channel) || AD_SDK_SCRIPT
+      const sdkInjectScript = getChannelRCSdkScript(channel) || MRAID_SCRIPT
       $(sdkInjectScript).appendTo('head')
 
-      // $(ONLOAD_SCRIPT).appendTo('head')
+      $(MRAID_INIT_SCRIPT).appendTo('head')
     }
   })
 }

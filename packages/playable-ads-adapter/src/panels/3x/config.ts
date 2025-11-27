@@ -1,7 +1,32 @@
 import { TAdapterRCKeysExcluded, TPanelSelector } from './types';
 
-export const CHANNEL_OPTIONS: TChannel[] = ['AppLovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'Mintegral', 'Moloco', 'Pangle', 'Rubeex', 'SnapChat', 'Tiktok', 'Unity'];
+export const CHANNEL_OPTIONS: TChannel[] = ['AppLovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'Mintegral', 'Moloco', 'Pangle', 'Rubeex', 'Tiktok', 'Unity', 'SnapChat', 'Yandex'];
 export const ORIENTATIONS: TWebOrientations[] = ['auto', 'portrait', 'landscape'];
+
+export type TTipLevel = 'info' | 'warn' | 'error';
+
+export type TChannelTip = {
+	message: string;
+	link?: string;
+	linkText?: string;
+	level?: TTipLevel;
+};
+
+export const DEFAULT_TIP: TChannelTip = {
+	message: '需要将构建发布面板中的"原生代码打包模式"改成AmsJS或者将物理引擎改成其他的，Bullet和Wasm就会引发如"i.xxx is not a function"的错误',
+	link: 'https://github.com/ppgee/cocos-pnp/issues/33',
+	linkText: '查看',
+	level: 'info'
+};
+
+export const CHANNEL_TIPS: Partial<Record<TChannel, TChannelTip>> = {
+	Yandex: {
+		message: 'Yandex 渠道要求最大存档大小为 3 MB，请确保构建产物压缩后不超过此限制',
+		link: 'https://yandex.ru/support/direct/zh/products-mobile-apps-ads/recommendations',
+		linkText: '查看详情',
+		level: 'warn'
+	}
+};
 
 // 配置常量
 export const CONFIG = {
@@ -15,6 +40,7 @@ export const IDS = {
     CREATE_BUTTONS: 'createButtons',
     NO_CONFIG_TIP: 'noConfigTip',
     CONFIG_PANEL: 'configPanel',
+    OPEN_BUILD_FOLDER: 'openBuildFolder',
     OPEN_CONFIG: 'openConfig',
     IMPORT_CONFIG: 'importConfig',
     EXPORT_CONFIG: 'exportConfig',
@@ -75,6 +101,8 @@ export const STYLE = `
     margin-top: 10px;
     font-size: 14px;
 }
+
+
 `;
 
 export const TEMPLATE = `
@@ -86,6 +114,7 @@ export const TEMPLATE = `
         </div>
     </div>
     <div id="${IDS.CONFIG_BUTTONS}" style="text-align: right; margin-bottom: 12px; display: none;">
+        <ui-button id="${IDS.OPEN_BUILD_FOLDER}">打开构建文件夹</ui-button>
         <ui-button id="${IDS.OPEN_CONFIG}">打开配置</ui-button>
         <ui-button id="${IDS.IMPORT_CONFIG}">导入配置</ui-button>
         <ui-button id="${IDS.EXPORT_CONFIG}">导出配置</ui-button>
@@ -154,16 +183,7 @@ export const TEMPLATE = `
         </ui-prop>
 
         <div class="section-header">导出渠道配置</div>
-        <ui-section header="额外配置 (Facebook、Google)" expand>
-            <ui-prop>
-                <ui-label>
-                    需要将构建发布面板中的"原生代码打包模式"改成AmsJS或者将物理引擎改成其他的，Bullet和Wasm就会引发如"i.xxx is not a function"的错误
-                    <ui-link tooltip="查看" value="https://github.com/ppgee/cocos-pnp/issues/33">
-                        <ui-icon value="help"></ui-icon>
-                    </ui-link>
-                </ui-label>
-            </ui-prop>
-        </ui-section>
+        <div id="defaultTipContainer"></div>
         <div id="channelContainer" class="channel-list">
             ${CHANNEL_OPTIONS.map(
     (channel) => `
@@ -171,6 +191,7 @@ export const TEMPLATE = `
             `
 ).join('')}
         </div>
+        <div id="channelTipsContainer"></div>
 
         <div class="section-header">注入选项配置</div>
         
@@ -224,6 +245,7 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
     [IDS.CREATE_BUTTONS]: `#${IDS.CREATE_BUTTONS}`,
     [IDS.NO_CONFIG_TIP]: `#${IDS.NO_CONFIG_TIP}`,
     [IDS.CONFIG_PANEL]: `#${IDS.CONFIG_PANEL}`,
+    [IDS.OPEN_BUILD_FOLDER]: `#${IDS.OPEN_BUILD_FOLDER}`,
     [IDS.OPEN_CONFIG]: `#${IDS.OPEN_CONFIG}`,
     [IDS.IMPORT_CONFIG]: `#${IDS.IMPORT_CONFIG}`,
     [IDS.EXPORT_CONFIG]: `#${IDS.EXPORT_CONFIG}`,
@@ -233,7 +255,6 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
     [IDS.BUILDING_MASK]: `#${IDS.BUILDING_MASK}`,
     [IDS.STORE_CONTAINER]: `#${IDS.STORE_CONTAINER}`,
 
-
     // 渠道相关选择器
     ...CHANNEL_OPTIONS.reduce(
         (acc, channel) => ({
@@ -242,8 +263,11 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
             [`${channel}-section`]: `#${channel}-section`,
             [`${channel}-head`]: `#${channel}-head`,
             [`${channel}-body`]: `#${channel}-body`,
-            [`${channel}-sdkScript`]: `#${channel}-sdkScript`
+            [`${channel}-sdkScript`]: `#${channel}-sdkScript`,
+            [`${channel}-tip`]: `#${channel}-tip`
         }),
         {}
-    )
+    ),
+    channelTipsContainer: '#channelTipsContainer',
+    defaultTipContainer: '#defaultTipContainer'
 };

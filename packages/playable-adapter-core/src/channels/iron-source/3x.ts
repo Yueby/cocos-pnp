@@ -1,7 +1,7 @@
-import { AD_SDK_SCRIPT, ONLOAD_SCRIPT } from './inject-vars';
 import { exportSingleFile } from '@/exporter/3x';
-import { getChannelRCSdkScript } from '@/utils';
 import { TChannel, TChannelPkgOptions } from '@/typings';
+import { getChannelRCSdkScript } from '@/utils';
+import { MRAID_INIT_SCRIPT, MRAID_SCRIPT } from './inject-vars';
 
 export const export3xIronSource = async (options: TChannelPkgOptions) => {
 	const channel: TChannel = 'IronSource';
@@ -9,10 +9,10 @@ export const export3xIronSource = async (options: TChannelPkgOptions) => {
 		...options,
 		channel,
 		transformHTML: async ($) => {
-			const sdkInjectScript = getChannelRCSdkScript(channel) || AD_SDK_SCRIPT;
+			const sdkInjectScript = getChannelRCSdkScript(channel) || MRAID_SCRIPT;
 			$(sdkInjectScript).appendTo('head');
 
-			$(ONLOAD_SCRIPT).appendTo('head');
+			$(MRAID_INIT_SCRIPT).appendTo('head');
 		}
 	});
 };
