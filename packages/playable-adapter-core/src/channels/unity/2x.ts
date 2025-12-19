@@ -1,7 +1,7 @@
-import { getChannelRCSdkScript } from "@/utils"
 import { exportSingleFile } from "@/exporter/2x"
 import { TChannel, TChannelPkgOptions } from "@/typings"
-import { INSERT_BEFORE_SCRIPT } from "./inject-vars"
+import { getChannelRCSdkScript } from "@/utils"
+import { MRAID_INIT_SCRIPT, MRAID_SCRIPT } from "./inject-vars"
 
 export const export2xUnity = async (options: TChannelPkgOptions) => {
   const channel: TChannel = 'Unity'
@@ -9,8 +9,9 @@ export const export2xUnity = async (options: TChannelPkgOptions) => {
     ...options,
     channel,
     transformHTML: async ($) => {
-      const sdkInjectScript = getChannelRCSdkScript(channel) || INSERT_BEFORE_SCRIPT
-      $('body script').first().before(sdkInjectScript)
+      const sdkInjectScript = getChannelRCSdkScript(channel) || MRAID_SCRIPT
+      $(sdkInjectScript).appendTo('head')
+      $(MRAID_INIT_SCRIPT).appendTo('head')
     }
   })
 }

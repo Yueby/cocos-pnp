@@ -1,2 +1,2 @@
-// 将下面代码放入 body 中
-export const INSERT_BEFORE_SCRIPT = `<script src="mraid.js"></script>`
+export const MRAID_SCRIPT = `<script src="mraid.js"></script>`
+export const MRAID_INIT_SCRIPT = `<script>(function(){window.mraidReady=false;function Start(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onSdkReady);}else{onSdkReady();}}function onSdkReady(){console.log('[Playable] MRAID SDK Ready');mraid.addEventListener('viewableChange',viewableChangeHandler);if(mraid.isViewable()){showMyAd();}}function showMyAd(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.director){cc.director.resume();cc.game.resume();}}function viewableChangeHandler(viewable){console.log('[Playable] MRAID Viewable:',viewable);if(viewable){showMyAd();}}if(typeof mraid!=='undefined'){window.mraidReady=true;Start();}else{window.mraidReady=false;console.warn('[Playable] MRAID Not available (test/preview mode)');}})();</script>`
