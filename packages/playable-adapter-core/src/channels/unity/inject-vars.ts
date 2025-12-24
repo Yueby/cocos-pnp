@@ -1,2 +1,5 @@
-export const MRAID_SCRIPT = `<script src="mraid.js"></script>`
-export const MRAID_INIT_SCRIPT = `<script>(function(){window.mraidReady=false;function Start(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onSdkReady);}else{onSdkReady();}}function onSdkReady(){console.log('[Playable] MRAID SDK Ready');mraid.addEventListener('viewableChange',viewableChangeHandler);if(mraid.isViewable()){showMyAd();}}function showMyAd(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.director){cc.director.resume();cc.game.resume();}}function viewableChangeHandler(viewable){console.log('[Playable] MRAID Viewable:',viewable);if(viewable){showMyAd();}}if(typeof mraid!=='undefined'){window.mraidReady=true;Start();}else{window.mraidReady=false;console.warn('[Playable] MRAID Not available (test/preview mode)');}})();</script>`
+import { MRAID_INIT_WITH_VIEWABLE, MRAID_SDK_SCRIPT } from '@/helpers/mraid-scripts'
+
+// Unity 要求等待 viewableChange 事件
+export const AD_SDK_SCRIPT = MRAID_SDK_SCRIPT
+export const MRAID_INIT_SCRIPT = MRAID_INIT_WITH_VIEWABLE

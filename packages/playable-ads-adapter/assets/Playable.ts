@@ -1,6 +1,7 @@
 import { _decorator, game } from 'cc';
 const { ccclass, property } = _decorator;
 
+// 导出渠道常量
 export const Channels = {
 	AppLovin: 'AppLovin',
 	Facebook: 'Facebook',
@@ -15,49 +16,34 @@ export const Channels = {
 	Unity: 'Unity',
 	SnapChat: 'SnapChat',
 	Yandex: 'Yandex'
-};
+} as const;
 
+// 类型定义
+interface PlayableType {
+	channel: string;
+	lang: string;
+	sdkReady: boolean;
+	isChannel(channel: string): boolean;
+	showAds(onSuccess?: () => void, onError?: () => void): void;
+	tryGameEnd(): void;
+	tryPause(): void;
+}
+
+// 创建 playable 对象
 // @ts-ignore
-window.advChannels = '{{__adv_channels_adapter__}}';
-// @ts-ignore
-window.language = '{{__language_adapter__}}';
-
-// 需要暂停的渠道列表
-const PAUSE_CHANNELS: string[] = [
-	Channels.Unity
-];
-
-export class Playable {
-	public static get channel(): string {
-		// @ts-ignore
-		return window.advChannels;
-	}
-
-	public static get lang(): string {
-		// @ts-ignore
-		return window.language;
-	}
-
-	public static isChannel(channel: string): boolean {
+window.playable = {
+	// 属性（占位符，构建时替换）
+	channel: '{{__adv_channels_adapter__}}',
+	lang: '{{__language_adapter__}}',
+	sdkReady: false,
+	
+	// 渠道判断
+	isChannel(channel: string): boolean {
 		return this.channel === channel;
-	}
-
-	public static tryPause(): void {
-		const currentChannel = this.channel;
-		if (PAUSE_CHANNELS.includes(currentChannel)) {
-			game.pause();
-			const mraidReady = (window as any).mraidReady;
-			// console.log('[GameStart] MRAID Ready:', mraidReady);
-			// 如果没有 MRAID 或者已经可见，恢复游戏
-			if (!mraidReady) {
-				game.resume();
-			} else {
-			}
-			// console.log(`[Playable] Game paused for channel: ${currentChannel}`);
-		}
-	}
-
-	public static showAds(onSuccess?: () => void, onError?: () => void): void {
+	},
+	
+	// 显示广告
+	showAds(onSuccess?: () => void, onError?: () => void): void {
 		try {
 			// @ts-ignore
 			if (typeof showAds !== 'function') {
@@ -69,8 +55,42 @@ export class Playable {
 			showAds();
 			onSuccess?.();
 		} catch (error) {
-			console.error(error);
+			console.error('[Playable] showAds error:', error);
 			onError?.();
 		}
+	},
+	
+	// 尝试调用游戏结束（通知平台）
+	tryGameEnd(): void {
+		switch (this.channel) {
+			case Channels.Mintegral:
+				// @ts-ignore
+				window.gameEnd && window.gameEnd();
+				break;
+			// 其他平台按需添加
+			default:
+				// 静默处理
+				break;
+		}
+	},
+	
+	// 尝试暂停（针对特定渠道）
+	tryPause(): void {
+		switch (this.channel) {
+			case Channels.Unity:
+				game.pause();
+				if (!this.sdkReady) {
+					game.resume();
+				}
+				break;
+			// 其他平台按需添加
+			default:
+				// 静默处理
+				break;
+		}
 	}
-}
+};
+
+// 导出类型化的别名
+// @ts-ignore
+export const Playable: PlayableType = window.playable;

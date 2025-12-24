@@ -1,7 +1,7 @@
-import { getChannelRCSdkScript } from '@/utils'
 import { exportSingleFile } from '@/exporter/2x'
-import { AD_SDK_SCRIPT } from './inject-vars'
 import { TChannel, TChannelPkgOptions } from "@/typings"
+import { getChannelRCSdkScript } from '@/utils'
+import { AD_SDK_SCRIPT } from './inject-vars'
 
 export const export2xAppLovin = async (options: TChannelPkgOptions) => {
   const channel: TChannel = 'AppLovin'

@@ -1,2 +1,5 @@
-export const MRAID_SCRIPT = `<script src="mraid.js"></script>`
+import { MRAID_SDK_SCRIPT } from '@/helpers/mraid-scripts'
+
+// IronSource 要求等待 ready + stateChange 事件
+export const AD_SDK_SCRIPT = MRAID_SDK_SCRIPT
 export const MRAID_INIT_SCRIPT = `<script>(function(){console.log('[MRAID] Checking MRAID availability...');if(typeof mraid==='undefined'){console.warn('[MRAID] Not available (test/preview mode)');return;}if(mraid.getState()==='loading'){mraid.addEventListener('ready',onMraidReady);}else{onMraidReady();}})();function onMraidReady(){console.log('[MRAID] Ready! Current state:',mraid.getState());mraid.addEventListener('stateChange',function(state){console.log('[MRAID] State changed to:',state);});mraid.addEventListener('viewableChange',function(viewable){console.log('[MRAID] Viewable:',viewable);});console.log('[MRAID] All event listeners registered ✓');}</script>`
