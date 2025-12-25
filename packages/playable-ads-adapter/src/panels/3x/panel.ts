@@ -452,13 +452,15 @@ function updateChannelTips() {
 		section.setAttribute('header', `${channel} 提示`);
 		section.setAttribute('expand', '');
 		
-		const prop = document.createElement('ui-prop');
-		const label = document.createElement('ui-label');
-		
-		const textNode = document.createTextNode(tip.message);
-		label.appendChild(textNode);
-		
-		if (tip.link) {
+	const prop = document.createElement('ui-prop');
+	const label = document.createElement('ui-label');
+	
+	// 支持 HTML 标签（如加粗）
+	const messageSpan = document.createElement('span');
+	messageSpan.innerHTML = tip.message;
+	label.appendChild(messageSpan);
+	
+	if (tip.link) {
 			const link = document.createElement('ui-link');
 			link.setAttribute('tooltip', tip.linkText || '查看详情');
 			link.setAttribute('value', tip.link);

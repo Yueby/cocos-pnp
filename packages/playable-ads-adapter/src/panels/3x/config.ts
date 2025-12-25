@@ -20,8 +20,14 @@ export const DEFAULT_TIP: TChannelTip = {
 };
 
 export const CHANNEL_TIPS: Partial<Record<TChannel, TChannelTip>> = {
+	Mintegral: {
+		message: '需要在结束页面出现时调用 <b>Playable.tryGameEnd()</b> 函数来通知平台游戏已结束',
+		link: 'https://www.playturbo.cn/review/doc',
+		linkText: '查看详情',
+		level: 'warn'
+	},
 	Yandex: {
-		message: 'Yandex 渠道要求最大存档大小为 3 MB，请确保构建产物压缩后不超过此限制',
+		message: '要求最大存档大小为 <b>3 MB</b>，请确保构建产物压缩后不超过此限制',
 		link: 'https://yandex.ru/support/direct/zh/products-mobile-apps-ads/recommendations',
 		linkText: '查看详情',
 		level: 'warn'
@@ -101,7 +107,6 @@ export const STYLE = `
     margin-top: 10px;
     font-size: 14px;
 }
-
 
 `;
 

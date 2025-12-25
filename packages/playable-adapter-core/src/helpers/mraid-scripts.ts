@@ -7,31 +7,73 @@
 // 同时初始化 window.playable 对象，确保后续脚本可以安全访问
 export const MRAID_SDK_SCRIPT = `<script src="mraid.js"></script><script>window.playable=window.playable||{sdkReady:false};</script>`
 
-/**
- * 完整版 MRAID 初始化
- * 包含: ready + stateChange + viewableChange
- * 适用平台: 需要完整生命周期控制的平台
- */
-export const MRAID_INIT_FULL = `<script>(function(){function initMraid(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onMraidReady);}else{onMraidReady();}}function onMraidReady(){console.log('[Playable] MRAID SDK Ready');window.playable.sdkReady=true;mraid.addEventListener('stateChange',function(state){console.log('[Playable] MRAID State:',state);});mraid.addEventListener('viewableChange',onViewableChange);if(mraid.isViewable()){resumeGame();}}function resumeGame(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.game){cc.game.resume();}}function onViewableChange(viewable){console.log('[Playable] MRAID Viewable:',viewable);if(viewable){resumeGame();}}if(typeof mraid!=='undefined'){initMraid();}else{console.warn('[Playable] MRAID Not available (test/preview mode)');}})();</script>`
+// === 通用代码片段 ===
+const INIT_MRAID_FN = `function initMraid(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onMraidReady);}else{onMraidReady();}}`
+const MRAID_CHECK = `if(typeof mraid!=='undefined'){initMraid();}else{console.warn('[Playable] MRAID Not available (test/preview mode)');}`
+const SDK_READY_LOG = `console.log('[Playable] MRAID SDK Ready');window.playable.sdkReady=true;`
+
+// === MRAID 配置接口 ===
+export interface MraidConfig {
+  /** ready 事件后的自定义逻辑 */
+  onReady?: string
+  /** 是否监听 stateChange */
+  stateChange?: string | boolean
+  /** 是否监听 viewableChange */
+  viewableChange?: string | boolean
+  /** 是否需要 resumeGame 函数 */
+  needResume?: boolean
+  /** 自定义 viewableChange 处理逻辑 */
+  onViewableChange?: string
+}
 
 /**
- * 带可见性监听的 MRAID 初始化
- * 包含: ready + viewableChange
- * 适用平台: Unity (强制要求等待可见)
+ * 生成 MRAID 初始化脚本
  */
-export const MRAID_INIT_WITH_VIEWABLE = `<script>(function(){function initMraid(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onMraidReady);}else{onMraidReady();}}function onMraidReady(){console.log('[Playable] MRAID SDK Ready');window.playable.sdkReady=true;mraid.addEventListener('viewableChange',onViewableChange);if(mraid.isViewable()){resumeGame();}}function resumeGame(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.game){cc.game.resume();}}function onViewableChange(viewable){console.log('[Playable] MRAID Viewable:',viewable);if(viewable){resumeGame();}}if(typeof mraid!=='undefined'){initMraid();}else{console.warn('[Playable] MRAID Not available (test/preview mode)');}})();</script>`
-
-/**
- * 带状态监听的 MRAID 初始化
- * 包含: ready + stateChange
- * 适用平台: IronSource
- */
-export const MRAID_INIT_WITH_STATE = `<script>(function(){function initMraid(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onMraidReady);}else{onMraidReady();}}function onMraidReady(){console.log('[Playable] MRAID SDK Ready');window.playable.sdkReady=true;mraid.addEventListener('stateChange',function(state){console.log('[Playable] MRAID State:',state);});resumeGame();}function resumeGame(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.game){cc.game.resume();}}if(typeof mraid!=='undefined'){initMraid();}else{console.warn('[Playable] MRAID Not available (test/preview mode)');}})();</script>`
-
-/**
- * 基础版 MRAID 初始化
- * 包含: ready
- * 适用平台: AppLovin
- */
-export const MRAID_INIT_BASIC = `<script>(function(){function initMraid(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onMraidReady);}else{onMraidReady();}}function onMraidReady(){console.log('[Playable] MRAID SDK Ready');window.playable.sdkReady=true;resumeGame();}function resumeGame(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.game){cc.game.resume();}}if(typeof mraid!=='undefined'){initMraid();}else{console.warn('[Playable] MRAID Not available (test/preview mode)');}})();</script>`
+export function createMraidScript(config: MraidConfig): string {
+  const parts: string[] = [INIT_MRAID_FN]
+  
+  // 构建 onMraidReady 函数体
+  let readyBody = SDK_READY_LOG
+  
+  // 添加 stateChange 监听
+  if (config.stateChange) {
+    const stateLogic = typeof config.stateChange === 'string' 
+      ? config.stateChange 
+      : `console.log('[Playable] MRAID State:',state);`
+    readyBody += `mraid.addEventListener('stateChange',function(state){${stateLogic}});`
+  }
+  
+  // 添加 viewableChange 监听
+  if (config.viewableChange) {
+    readyBody += `mraid.addEventListener('viewableChange',onViewableChange);`
+    readyBody += `if(mraid.isViewable()){resumeGame();}`
+  }
+  
+  // 添加自定义 ready 逻辑或默认 resumeGame
+  if (config.onReady) {
+    readyBody += config.onReady
+  } else if (config.needResume && !config.viewableChange) {
+    // 如果需要 resumeGame 且没有配置 viewableChange，则默认在 ready 后调用
+    readyBody += `resumeGame();`
+  }
+  
+  parts.push(`function onMraidReady(){${readyBody}}`)
+  
+  // 添加 resumeGame 函数
+  if (config.needResume) {
+    parts.push(`function resumeGame(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.game){cc.game.resume();}}`)
+  }
+  
+  // 添加 viewableChange 处理函数
+  if (config.viewableChange) {
+    const viewableLogic = typeof config.viewableChange === 'string'
+      ? config.viewableChange
+      : config.onViewableChange || `console.log('[Playable] MRAID Viewable:',viewable);if(viewable){resumeGame();}`
+    parts.push(`function onViewableChange(viewable){${viewableLogic}}`)
+  }
+  
+  parts.push(MRAID_CHECK)
+  
+  return `<script>(function(){${parts.join('')}})();</script>`
+}
 
