@@ -37,7 +37,7 @@ type TPlatform =
 	| 'ar-android'
 	| 'ar-ios';
 
-type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity' | 'SnapChat' | 'Yandex';
+type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity' | 'SnapChat' | 'Yandex' | 'Bigo';
 
 type TIpcMsgEvent =
 	/** 编译状态更新时，发送的消息 */

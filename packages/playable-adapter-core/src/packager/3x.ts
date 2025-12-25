@@ -1,5 +1,6 @@
 import {
   export3xAppLovin,
+  export3xBigo,
   export3xFacebook,
   export3xGoogle,
   export3xIronSource,
@@ -21,6 +22,7 @@ import { genChannelsPkg as baseGenChannelsPkg, TMode } from './base';
 
 const channelExports: { [key in TChannel]: (options: TChannelPkgOptions) => Promise<void> } = {
   AppLovin: export3xAppLovin,
+  Bigo: export3xBigo,
   Facebook: export3xFacebook,
   Google: export3xGoogle,
   IronSource: export3xIronSource,

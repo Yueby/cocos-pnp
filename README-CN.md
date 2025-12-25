@@ -4,12 +4,51 @@ Cocos 广告试玩多渠道导出插件
 
 ## 该 Fork 修改
 
+**⚠️ 重要说明：本 Fork 仅支持 Cocos Creator 3.x 版本，2.x 版本未经测试，不保证可用性。**
+
 为了适配自己的工作流，作出了以下修改：
 
 -   构建发布面板内 UI
 -   自定义导出文件名
 -   自定义 HTML 标题名
 -   自定义 IOS 和 Android 平台的 URL，并通过\<ios>和\<android>标签对 injectOptions 属性中 Channel 的 Body 字符串进行替换
+-   新增 Bigo、SnapChat、Yandex 渠道支持
+-   优化 MRAID SDK 集成和平台生命周期管理
+-   **提供 `Playable` 工具类用于平台 API 调用（本 Fork 新增）**
+
+### 新增 Playable 工具类
+
+本 Fork 新增了全局 `Playable` 对象，简化平台判断和 API 调用：
+
+```typescript
+import { Playable, Channels } from 'db://playable-ads-adapter/Playable';
+
+// 判断当前渠道
+if (Playable.isChannel(Channels.Unity)) {
+  console.log('当前是 Unity 渠道');
+}
+
+// 获取当前渠道名称和语言
+console.log(Playable.channel); // 如: 'Unity', 'Mintegral', 'Bigo'
+console.log(Playable.lang);     // 语言代码
+
+// 检查 SDK 是否就绪（MRAID 平台）
+console.log(Playable.sdkReady);
+
+// 显示广告
+Playable.showAds(
+  () => console.log('广告显示成功'), 
+  () => console.log('广告显示失败')
+);
+
+// 游戏结束通知（Mintegral 和 Bigo 平台必须调用）
+Playable.tryGameEnd();
+
+// 尝试暂停游戏（Unity 平台自动处理）
+Playable.tryPause();
+```
+
+### 配置文件修改
 
 下面为部分修改内容:
 
@@ -88,13 +127,13 @@ export type TAdapterRC = {
 
 ### 安装插件
 
-将下载好的插件解压后放到 Cocos 对应的插件文件夹：
+将下载好的插件解压后放到 Cocos Creator 3.x 的插件文件夹：
 
--   2.x 的插件目录是项目根目录的 packages
-
--   3.x 的插件目录是项目根目录的 extensions
+-   **3.x 的插件目录是项目根目录的 `extensions`**
 
 安装后即可使用（如果找不到插件的，可以选择重启一下项目）
+
+**注意：本 Fork 仅支持 Cocos Creator 3.x 版本。如需 2.x 版本支持，请使用[原仓库](https://github.com/ppgee/cocos-pnp)。**
 
 ## 使用插件
 
@@ -106,10 +145,14 @@ export type TAdapterRC = {
 
 ### 支持渠道
 
-|              | AppLovin | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | Tiktok | Unity |
-| ------------ | -------- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | ------ | ----- |
-| **>= 2.4.6** | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅     | ✅    |
-| **3.8.x**    | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅     | ✅    |
+|              | AppLovin | Bigo | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | SnapChat | Tiktok | Unity | Yandex |
+| ------------ | -------- | ---- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | -------- | ------ | ----- | ------ |
+| **>= 2.4.6** | ⚠️       | ⚠️   | ⚠️       | ⚠️     | ⚠️         | ⚠️      | ⚠️        | ⚠️     | ⚠️     | ⚠️     | ⚠️       | ⚠️     | ⚠️    | ⚠️     |
+| **3.x**      | ✅       | ✅   | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅       | ✅     | ✅    | ✅     |
+
+**注意：**
+- ✅ = 已测试并支持
+- ⚠️ = 未测试，不保证可用（本 Fork 仅专注于 3.x 版本）
 
 ### 额外支持功能
 
@@ -126,7 +169,7 @@ window.advChannels = 'Facebook';
 2. 支持扩展注入脚本功能，可以在此配置每个渠道下特殊的业务代码，需要在根目录下创建 `.adapterrc`，里面以 JSON 格式进行编辑，其中里面的配置信息和案例如下：
 
 ```typescript
-type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity';
+type TChannel = 'AppLovin' | 'Bigo' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity' | 'SnapChat' | 'Yandex';
 
 type TPlatform = 'web-desktop' | 'web-mobile';
 

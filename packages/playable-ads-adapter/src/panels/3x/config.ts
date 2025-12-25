@@ -1,37 +1,41 @@
 import { TAdapterRCKeysExcluded, TPanelSelector } from './types';
 
-export const CHANNEL_OPTIONS: TChannel[] = ['AppLovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'Mintegral', 'Moloco', 'Pangle', 'Rubeex', 'Tiktok', 'Unity', 'SnapChat', 'Yandex'];
+export const CHANNEL_OPTIONS: TChannel[] = ['AppLovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'Mintegral', 'Moloco', 'Pangle', 'Rubeex', 'Tiktok', 'Unity', 'SnapChat', 'Yandex', 'Bigo'];
 export const ORIENTATIONS: TWebOrientations[] = ['auto', 'portrait', 'landscape'];
 
 export type TTipLevel = 'info' | 'warn' | 'error';
 
 export type TChannelTip = {
-	message: string;
-	link?: string;
-	linkText?: string;
-	level?: TTipLevel;
+    message: string;
+    link?: string;
+    linkText?: string;
+    level?: TTipLevel;
 };
 
 export const DEFAULT_TIP: TChannelTip = {
-	message: '需要将构建发布面板中的"原生代码打包模式"改成AmsJS或者将物理引擎改成其他的，Bullet和Wasm就会引发如"i.xxx is not a function"的错误',
-	link: 'https://github.com/ppgee/cocos-pnp/issues/33',
-	linkText: '查看',
-	level: 'info'
+    message: '需要将构建发布面板中的"原生代码打包模式"改成AmsJS或者将物理引擎改成其他的，Bullet和Wasm就会引发如"i.xxx is not a function"的错误',
+    link: 'https://github.com/ppgee/cocos-pnp/issues/33',
+    linkText: '查看',
+    level: 'info'
 };
 
 export const CHANNEL_TIPS: Partial<Record<TChannel, TChannelTip>> = {
-	Mintegral: {
-		message: '需要在结束页面出现时调用 <b>Playable.tryGameEnd()</b> 函数来通知平台游戏已结束',
-		link: 'https://www.playturbo.cn/review/doc',
-		linkText: '查看详情',
-		level: 'warn'
-	},
-	Yandex: {
-		message: '要求最大存档大小为 <b>3 MB</b>，请确保构建产物压缩后不超过此限制',
-		link: 'https://yandex.ru/support/direct/zh/products-mobile-apps-ads/recommendations',
-		linkText: '查看详情',
-		level: 'warn'
-	}
+    Bigo: {
+        message: '需要在结束页面出现时调用 <b>Playable.tryGameEnd()</b> 函数来通知平台游戏已结束',
+        level: 'warn'
+    },
+    Mintegral: {
+        message: '需要在结束页面出现时调用 <b>Playable.tryGameEnd()</b> 函数来通知平台游戏已结束',
+        link: 'https://www.playturbo.cn/review/doc',
+        linkText: '查看详情',
+        level: 'warn'
+    },
+    Yandex: {
+        message: '要求最大存档大小为 <b>3 MB</b>，请确保构建产物压缩后不超过此限制',
+        link: 'https://yandex.ru/support/direct/zh/products-mobile-apps-ads/recommendations',
+        linkText: '查看详情',
+        level: 'warn'
+    }
 };
 
 // 配置常量

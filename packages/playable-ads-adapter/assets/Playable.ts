@@ -15,7 +15,8 @@ export const Channels = {
 	Tiktok: 'Tiktok',
 	Unity: 'Unity',
 	SnapChat: 'SnapChat',
-	Yandex: 'Yandex'
+	Yandex: 'Yandex',
+	Bigo: 'Bigo'
 } as const;
 
 // 类型定义
@@ -66,6 +67,10 @@ window.playable = {
 			case Channels.Mintegral:
 				// @ts-ignore
 				window.gameEnd && window.gameEnd();
+				break;
+			case Channels.Bigo:
+				// @ts-ignore
+				window.BGY_MRAID && window.BGY_MRAID.gameEnd();
 				break;
 			// 其他平台按需添加
 			default:

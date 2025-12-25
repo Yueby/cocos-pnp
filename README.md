@@ -4,7 +4,49 @@ A Plugin for Exporting Cocos Playable Ads in Multi-Channel.
 
 中文说明，点击[这里](./README-CN.md)
 
-If you only need to use the plugin, you can download [the build package](https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true) directly. The major versions are differentiated between `2.x` and `3.x`. Currently, the tested versions are `2.4.9`, `2.4.10`, and `3.x`. For other versions, please test them yourself. If you have any questions, feel free to submit an issue or pull request.
+**⚠️ Important: This fork only supports Cocos Creator 3.x. Version 2.x is untested and not guaranteed to work.**
+
+**New Features in This Fork:**
+- Added support for Bigo, SnapChat, and Yandex channels
+- Optimized MRAID SDK integration and platform lifecycle management
+- **Provided `Playable` utility class for platform API calls (New in This Fork)**
+- Enhanced UI in build panel
+
+### New Playable Utility Class
+
+This fork introduces a global `Playable` object to simplify channel detection and API calls:
+
+```typescript
+import { Playable, Channels } from 'db://playable-ads-adapter/Playable';
+
+// Check current channel
+if (Playable.isChannel(Channels.Unity)) {
+  console.log('Current channel is Unity');
+}
+
+// Get current channel name and language
+console.log(Playable.channel); // e.g., 'Unity', 'Mintegral', 'Bigo'
+console.log(Playable.lang);     // Language code
+
+// Check if SDK is ready (MRAID platforms)
+console.log(Playable.sdkReady);
+
+// Show ads
+Playable.showAds(
+  () => console.log('Ad shown successfully'), 
+  () => console.log('Ad failed to show')
+);
+
+// Notify game end (Required for Mintegral and Bigo)
+Playable.tryGameEnd();
+
+// Try to pause game (Unity platform handles automatically)
+Playable.tryPause();
+```
+
+---
+
+If you only need to use the plugin, you can download [the build package](https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true) directly. For other versions, please test them yourself. If you have any questions, feel free to submit an issue or pull request.
 
 ## Download
 
@@ -14,13 +56,13 @@ Plugin download link:
 
 ## Install
 
-After downloading the plugin, extract it and place it in the corresponding plugin folder for Cocos:
+After downloading the plugin, extract it and place it in the Cocos Creator 3.x plugin folder:
 
-- For 2.x, the plugin folder is `packages` in the root directory of the project.
-
-- For 3.x, the plugin folder is `extensions` in the root directory of the project.
+- **For 3.x, the plugin folder is `extensions` in the root directory of the project.**
 
 Once installed, you can use it. If you cannot find the plugin, try restarting the project.
+
+**Note: This fork only supports Cocos Creator 3.x. For 2.x support, please use the [original repository](https://github.com/ppgee/cocos-pnp).**
 
 ## Using the Plugin
 
@@ -32,10 +74,14 @@ Once installed, you can use it. If you cannot find the plugin, try restarting th
 
 ### Supported Channels
 
-|              | AppLovin | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | Tiktok | Unity |
-| ------------ | -------- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | ------ | ----- |
-| **>= 2.4.6** | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅     | ✅    |
-| **3.8.x**    | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅     | ✅    |
+|              | AppLovin | Bigo | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | SnapChat | Tiktok | Unity | Yandex |
+| ------------ | -------- | ---- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | -------- | ------ | ----- | ------ |
+| **>= 2.4.6** | ⚠️       | ⚠️   | ⚠️       | ⚠️     | ⚠️         | ⚠️      | ⚠️        | ⚠️     | ⚠️     | ⚠️     | ⚠️       | ⚠️     | ⚠️    | ⚠️     |
+| **3.x**      | ✅       | ✅   | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅       | ✅     | ✅    | ✅     |
+
+**Note:**
+- ✅ = Tested and supported
+- ⚠️ = Untested, not guaranteed to work (this fork focuses on 3.x only)
 
 ### Extend Features
 
@@ -54,6 +100,7 @@ window.advChannels = 'Facebook'
 ```typescript
 type TChannel =
   | 'AppLovin'
+  | 'Bigo'
   | 'Facebook'
   | 'Google'
   | 'IronSource'
@@ -64,6 +111,8 @@ type TChannel =
   | 'Rubeex'
   | 'Tiktok'
   | 'Unity'
+  | 'SnapChat'
+  | 'Yandex'
 
 type TPlatform =
   | 'web-desktop'

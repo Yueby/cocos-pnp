@@ -1,4 +1,5 @@
 export * from './app-lovin';
+export * from './bigo';
 export * from './facebook';
 export * from './google';
 export * from './iron-source';

@@ -66,7 +66,7 @@ export type TZipFromSingleFileOptions = TBuilderOptions & {
 
 };
 
-export type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity' | 'SnapChat' | 'Yandex';
+export type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity' | 'SnapChat' | 'Yandex' | 'Bigo';
 
 export type TChannelRC = {
 	head: string;

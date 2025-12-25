@@ -1,5 +1,6 @@
 import {
   export2xAppLovin,
+  export2xBigo,
   export2xFacebook,
   export2xGoogle,
   export2xIronSource,
@@ -21,6 +22,7 @@ import { genChannelsPkg as baseGenChannelsPkg, TMode } from './base';
 
 const channelExports: { [key in TChannel]: (options: TChannelPkgOptions) => Promise<void> } = {
   AppLovin: export2xAppLovin,
+  Bigo: export2xBigo,
   Facebook: export2xFacebook,
   Google: export2xGoogle,
   IronSource: export2xIronSource,
@@ -29,9 +31,9 @@ const channelExports: { [key in TChannel]: (options: TChannelPkgOptions) => Prom
   Moloco: export2xMoloco,
   Pangle: export2xPangle,
   Rubeex: export2xRubeex,
+  SnapChat: export2xSnapChat,
   Tiktok: export2xTiktok,
   Unity: export2xUnity,
-  SnapChat: export2xSnapChat,
   Yandex: export2xYandex,
 }
 
