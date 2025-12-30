@@ -1,19 +1,13 @@
-import { TPlayableConfig, TWebOrientations } from '@/typings'
-import { ADAPTER_FETCH, PLAYABLE_DEFAULT_CONFIG } from "@/constants"
-import { writeToPath } from './file-system';
+import { ADAPTER_FETCH, ORIENTATION_MAP, PLAYABLE_DEFAULT_CONFIG } from "@/constants";
+import { TPlayableConfig, TWebOrientations } from '@/typings';
 import { join } from "path";
+import { writeToPath } from './file-system';
 
 const getPlayableConfig = (options?: { orientation?: TWebOrientations, languages?: string[] }) => {
   const { orientation, languages } = options || {}
 
-  const OrientationMap: { [key in TWebOrientations]: 0 | 1 | 2 } = {
-    auto: 0,
-    portrait: 1,
-    landscape: 2
-  }
-
   const playableConfig: TPlayableConfig = {
-    playable_orientation: orientation ? OrientationMap[orientation] : PLAYABLE_DEFAULT_CONFIG.playable_orientation,
+    playable_orientation: orientation ? ORIENTATION_MAP[orientation] : PLAYABLE_DEFAULT_CONFIG.playable_orientation,
     playable_languages: languages || PLAYABLE_DEFAULT_CONFIG.playable_languages
   }
 
@@ -38,12 +32,15 @@ export const exportConfigJson = async (options: {
   destPath: string
   orientation?: TWebOrientations;
   languages?: string[];
+  customConfig?: Record<string, any>;
 }) => {
-  const { destPath, orientation, languages } = options
-  const playableConfig = getPlayableConfig({
+  const { destPath, orientation, languages, customConfig } = options
+  
+  const config = customConfig || getPlayableConfig({
     orientation,
     languages
   })
+  
   const configJsonPath = join(destPath, '/config.json')
-  writeToPath(configJsonPath, JSON.stringify(playableConfig))
+  writeToPath(configJsonPath, JSON.stringify(config))
 }

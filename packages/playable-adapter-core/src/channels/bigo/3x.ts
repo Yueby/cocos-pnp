@@ -1,3 +1,4 @@
+import { ORIENTATION_MAP } from '@/constants';
 import { exportZipFromSingleFile } from '@/exporter/3x';
 import { TChannel, TChannelPkgOptions } from '@/typings';
 import { exportConfigJson, getChannelRCSdkScript } from '@/utils';
@@ -20,7 +21,7 @@ export const export3xBigo = async (options: TChannelPkgOptions) => {
 		transform: async (destPath) => {
 			await exportConfigJson({
 				destPath,
-				orientation
+				customConfig: { orientation: ORIENTATION_MAP[orientation] }
 			});
 		}
 	});
