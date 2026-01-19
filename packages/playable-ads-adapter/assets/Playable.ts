@@ -30,13 +30,15 @@ interface PlayableType {
 	tryPause(): void;
 }
 
-// 创建 playable 对象
+// 创建 playable 对象（保留 MRAID 设置的 sdkReady）
+// @ts-ignore
+const _existingSdkReady = window.playable?.sdkReady;
 // @ts-ignore
 window.playable = {
 	// 属性（占位符，构建时替换）
 	channel: '{{__adv_channels_adapter__}}',
 	lang: '{{__language_adapter__}}',
-	sdkReady: false,
+	sdkReady: _existingSdkReady !== undefined ? _existingSdkReady : false,
 	
 	// 渠道判断
 	isChannel(channel: string): boolean {

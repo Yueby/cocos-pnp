@@ -4,13 +4,12 @@
  */
 
 // MRAID SDK 引用（所有平台通用）
-// 同时初始化 window.playable 对象，确保后续脚本可以安全访问
-export const MRAID_SDK_SCRIPT = `<script src="mraid.js"></script><script>window.playable=window.playable||{sdkReady:false};</script>`
+export const MRAID_SDK_SCRIPT = `<script src="mraid.js"></script>`
 
 // === 通用代码片段 ===
 const INIT_MRAID_FN = `function initMraid(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onMraidReady);}else{onMraidReady();}}`
-const MRAID_CHECK = `if(typeof mraid!=='undefined'){initMraid();}else{console.warn('[Playable] MRAID Not available (test/preview mode)');}`
-const SDK_READY_LOG = `console.log('[Playable] MRAID SDK Ready');window.playable.sdkReady=true;`
+const MRAID_CHECK = `if(typeof mraid!=='undefined'){window.playable.sdkReady=true;initMraid();}else{console.warn('[Playable] MRAID Not available (test/preview mode)');}`
+const SDK_READY_LOG = `console.log('[Playable] MRAID SDK Ready');`
 
 // === MRAID 配置接口 ===
 export interface MraidConfig {
@@ -61,7 +60,8 @@ export function createMraidScript(config: MraidConfig): string {
   
   // 添加 resumeGame 函数
   if (config.needResume) {
-    parts.push(`function resumeGame(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.game){cc.game.resume();}}`)
+    parts.push(`function resumeGame(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.director){cc.director.resume();cc.game.resume();}startPauseMonitor();}`)
+    parts.push(`function startPauseMonitor(){if(window._pauseMonitor)return;var t=Date.now();window._pauseMonitor=setInterval(function(){if(typeof cc!=='undefined'&&cc.game){if(cc.game.isPaused()){cc.director.resume();cc.game.resume();clearInterval(window._pauseMonitor);window._pauseMonitor=null;}else if(Date.now()-t>2000){clearInterval(window._pauseMonitor);window._pauseMonitor=null;}}},100);}`)
   }
   
   // 添加 viewableChange 处理函数
@@ -74,6 +74,6 @@ export function createMraidScript(config: MraidConfig): string {
   
   parts.push(MRAID_CHECK)
   
-  return `<script>(function(){${parts.join('')}})();</script>`
+  return `<script>(function(){window.playable=window.playable||{sdkReady:false};${parts.join('')}})();</script>`
 }
 
