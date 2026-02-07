@@ -1,4 +1,4 @@
-import { _decorator, game } from 'cc';
+import { _decorator } from 'cc';
 const { ccclass, property } = _decorator;
 
 // 导出渠道常量
@@ -23,22 +23,18 @@ export const Channels = {
 interface PlayableType {
 	channel: string;
 	lang: string;
-	sdkReady: boolean;
 	isChannel(channel: string): boolean;
 	showAds(onSuccess?: () => void, onError?: () => void): void;
 	tryGameEnd(): void;
-	tryPause(): void;
+	start(): void;
 }
 
-// 创建 playable 对象（保留 MRAID 设置的 sdkReady）
-// @ts-ignore
-const _existingSdkReady = window.playable?.sdkReady;
+// 创建 playable 对象
 // @ts-ignore
 window.playable = {
 	// 属性（占位符，构建时替换）
 	channel: '{{__adv_channels_adapter__}}',
 	lang: '{{__language_adapter__}}',
-	sdkReady: _existingSdkReady !== undefined ? _existingSdkReady : false,
 	
 	// 渠道判断
 	isChannel(channel: string): boolean {
@@ -81,13 +77,13 @@ window.playable = {
 		}
 	},
 	
-	// 尝试暂停（针对特定渠道）
-	tryPause(): void {
+	// 启动游戏（针对特定渠道）
+	start(): void {
 		switch (this.channel) {
 			case Channels.Unity:
-				game.pause();
-				if (!this.sdkReady) {
-					game.resume();
+				// 调用 checkViewable 检查可见性
+				if (typeof (window as any).checkViewable === 'function') {
+					(window as any).checkViewable();
 				}
 				break;
 			// 其他平台按需添加
