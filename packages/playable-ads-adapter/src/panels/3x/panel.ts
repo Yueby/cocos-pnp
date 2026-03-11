@@ -2,6 +2,7 @@
 
 import { shell } from 'electron';
 import { existsSync, promises } from 'fs';
+import https from 'https';
 
 import { buildState } from '../../extensions/builder/3x';
 import { ADAPTER_RC_PATH } from '../../extensions/constants';
@@ -78,7 +79,7 @@ async function initStoreConfig(config: TAdapterRC) {
 async function initPanelConfig(config: TAdapterRC) {
 	try {
 		setOptions(config);
-		init();
+		await init();
 		await initStoreConfig(config);
 	} catch (err) {
 		logger.error('初始化面板配置失败:', err);
@@ -94,6 +95,11 @@ export async function ready(options: ITaskOptions) {
 
 		// 初始化构建状态监听器
 		initBuildStateListener();
+
+		// 适配完成后自动刷新压缩用量
+		Editor.Message.addBroadcastListener('adapter:build-finished', () => {
+			setTimeout(() => handleValidateKeyClick(), 500);
+		});
 
 		// 监听语言更新消息
 		Editor.Message.addBroadcastListener('update-panel-language', (lang: string) => {
@@ -137,7 +143,7 @@ export async function update(options: ITaskOptions, key: string) {
 		// 先应用配置到UI
 		const config = options.packages[PACKAGE_NAME];
 		if (config) {
-			applyConfig(config);
+			await applyConfig(config);
 		}
 
 		// 然后保存到文件
@@ -147,7 +153,7 @@ export async function update(options: ITaskOptions, key: string) {
 	}
 
 	if (!key) {
-		init();
+		await init();
 	}
 }
 
@@ -196,6 +202,35 @@ function addChannelInputListeners(channel: TChannel) {
 	});
 }
 
+function validateTinifyApiKey(apiKey: string): Promise<{ valid: boolean; count: number; exceeded: boolean; message: string }> {
+	return new Promise((resolve) => {
+		const req = https.request({
+			hostname: 'api.tinify.com',
+			path: '/shrink',
+			method: 'POST',
+			auth: `api:${apiKey}`,
+		}, (res) => {
+			const count = parseInt(res.headers['compression-count'] as string, 10) || 0;
+
+			if (res.statusCode === 401) {
+				resolve({ valid: false, count: 0, exceeded: false, message: 'API Key 无效' });
+			} else if (res.statusCode === 429) {
+				resolve({ valid: true, count, exceeded: true, message: '配额已用尽' });
+			} else {
+				resolve({ valid: true, count, exceeded: false, message: '' });
+			}
+
+			res.resume();
+		});
+
+		req.on('error', (err) => {
+			resolve({ valid: false, count: 0, exceeded: false, message: `验证失败: ${err.message}` });
+		});
+
+		req.end();
+	});
+}
+
 // tinify 复选框的事件处理函数
 const handleTinifyChange = (event: any) => {
 	updateTinifyKeyVisibility(event.target.value);
@@ -217,7 +252,93 @@ const handleIsZipChange = (event: any) => {
 	panel.dispatch('update', `packages.${PACKAGE_NAME}.isZip`, event.target.value);
 };
 
-function initBaseConfig() {
+const PROFILE_KEY_COMPRESSION_MAX = 'tinifyCompressionMax';
+const DEFAULT_COMPRESSION_MAX = 500;
+
+async function getCompressionMax(): Promise<number> {
+	try {
+		const val = await Editor.Profile.getConfig(PACKAGE_NAME, PROFILE_KEY_COMPRESSION_MAX, 'global');
+		if (typeof val === 'number' && val > 0) return val;
+	} catch (_) { /* ignore */ }
+	return DEFAULT_COMPRESSION_MAX;
+}
+
+async function setCompressionMax(value: number): Promise<void> {
+	try {
+		await Editor.Profile.setConfig(PACKAGE_NAME, PROFILE_KEY_COMPRESSION_MAX, Math.max(1, value), 'global');
+	} catch (_) { /* ignore */ }
+}
+
+let lastCompressionCount = -1;
+
+function updateCompressionProgress(count: number, max: number) {
+	lastCompressionCount = count;
+	const progress = panel.$[IDS.COMPRESSION_PROGRESS];
+	const countLabel = panel.$[IDS.COMPRESSION_COUNT];
+
+	if (!progress || !countLabel) return;
+
+	const percent = Math.min(Math.round((count / max) * 100), 100);
+	progress.setAttribute('value', String(percent));
+
+	progress.removeAttribute('success');
+	progress.removeAttribute('failure');
+	if (percent >= 100) {
+		progress.setAttribute('failure', '');
+	} else if (percent < 80) {
+		progress.setAttribute('success', '');
+	}
+
+	countLabel.setAttribute('value', `已使用 ${count} /`);
+}
+
+// 配额上限变更处理
+const handleCompressionMaxChange = async (event: any) => {
+	const raw = event.target.value ?? event.detail?.value;
+	const val = parseInt(raw, 10);
+	if (val > 0) {
+		await setCompressionMax(val);
+		await handleValidateKeyClick();
+	}
+};
+
+// 验证 API Key 按钮的事件处理函数
+const handleValidateKeyClick = async () => {
+	const config = getOptions();
+	const apiKey = config.tinifyApiKey;
+	const countLabel = panel.$[IDS.COMPRESSION_COUNT];
+	const validateBtn = panel.$[IDS.VALIDATE_KEY];
+
+	if (!apiKey) {
+		countLabel.setAttribute('value', '请先填写 API Key');
+		countLabel.style.color = '#ff4d4f';
+		return;
+	}
+
+	validateBtn.setAttribute('disabled', '');
+	countLabel.setAttribute('value', '验证中...');
+	countLabel.style.color = '';
+
+	try {
+		const result = await validateTinifyApiKey(apiKey);
+		const max = await getCompressionMax();
+
+		if (result.valid) {
+			const count = result.exceeded && result.count === 0 ? max : result.count;
+			updateCompressionProgress(count, max);
+		} else {
+			countLabel.setAttribute('value', result.message);
+			countLabel.style.color = '#ff4d4f';
+		}
+	} catch (err: any) {
+		countLabel.setAttribute('value', `验证异常: ${err.message}`);
+		countLabel.style.color = '#ff4d4f';
+	} finally {
+		validateBtn.removeAttribute('disabled');
+	}
+};
+
+async function initBaseConfig() {
 	const config = getOptions();
 
 	// 基础配置字段
@@ -264,6 +385,47 @@ function initBaseConfig() {
 	tinify.addEventListener(EVENT_TYPES.CHANGE, handleTinifyChange);
 	updateTinifyKeyVisibility(config.tinify === true);
 
+	// 验证 API Key 按钮
+	const validateBtn = panel.$[IDS.VALIDATE_KEY];
+	validateBtn.addEventListener(EVENT_TYPES.CLICK, handleValidateKeyClick);
+
+	// 通过 JS 调整按钮和输入框的布局样式（HTML inline style 不生效）
+	const tinifyApiKeyInput = panel.$['tinifyApiKey'];
+	tinifyApiKeyInput.style.flex = '1';
+	validateBtn.style.flex = '0 0 auto';
+	validateBtn.style.marginLeft = '4px';
+
+	// 调整 ui-prop 内 content slot 容器的间距
+	const tinifyKeyRow = panel.$[IDS.TINIFY_KEY_ROW];
+	if (tinifyKeyRow?.shadowRoot) {
+		const contentEl = tinifyKeyRow.shadowRoot.querySelector('.content') as HTMLElement | null;
+		if (contentEl) {
+			contentEl.style.gap = '4px';
+		}
+	}
+
+	// API Key 输入确认后自动验证
+	tinifyApiKeyInput.addEventListener('confirm', () => {
+		setTimeout(() => handleValidateKeyClick(), 0);
+	});
+
+	// 配额上限输入框
+	const compressionMaxInput = panel.$[IDS.COMPRESSION_MAX];
+	compressionMaxInput.setAttribute('value', String(await getCompressionMax()));
+	compressionMaxInput.addEventListener('confirm', handleCompressionMaxChange);
+	compressionMaxInput.addEventListener('change', handleCompressionMaxChange);
+
+	// 通过 JS 设置进度条的 flex 布局样式
+	const compressionProgress = panel.$[IDS.COMPRESSION_PROGRESS];
+	compressionProgress.style.flex = '1';
+	compressionMaxInput.style.flex = '0 0 auto';
+	compressionMaxInput.style.width = '64px';
+
+	// 延迟一帧自动验证（如果有 API Key）
+	if (config.tinifyApiKey) {
+		setTimeout(() => handleValidateKeyClick(), 0);
+	}
+
 	// 启用插屏
 	const enableSplash = panel.$['enableSplash'];
 	enableSplash.value = config.enableSplash;
@@ -281,11 +443,14 @@ function initBaseConfig() {
 }
 
 function updateTinifyKeyVisibility(isVisible: boolean) {
-	const tinifyApiKey = panel.$['tinifyApiKey'];
-	// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查 tinifyApiKey 是否存在
-	// 但仍需检查 parentElement，因为它不是由 initPanelElements 管理的
-	if (tinifyApiKey.parentElement) {
-		tinifyApiKey.parentElement.style.display = isVisible ? '' : 'none';
+	const keyRow = panel.$[IDS.TINIFY_KEY_ROW];
+	if (keyRow) {
+		keyRow.style.display = isVisible ? '' : 'none';
+	}
+
+	const validateRow = panel.$[IDS.TINIFY_VALIDATE_ROW];
+	if (validateRow) {
+		validateRow.style.display = isVisible ? '' : 'none';
 	}
 }
 
@@ -320,8 +485,8 @@ function onChannelClick(event: any) {
 	updateChannelTips();
 }
 
-function init() {
-	initBaseConfig();
+async function init() {
+	await initBaseConfig();
 	initChannels();
 	updateInjectOptions();
 	updateDefaultTip();
@@ -608,7 +773,7 @@ function createDefaultConfig(): TAdapterRC {
  * 应用配置到UI
  * @param config 配置对象
  */
-function applyConfig(config: TAdapterRC) {
+async function applyConfig(config: TAdapterRC) {
 	try {
 		// 更新配置
 		setOptions(config);
@@ -616,7 +781,7 @@ function applyConfig(config: TAdapterRC) {
 		// 更新 UI
 		showConfigPanel();
 		initConfigPanelButtons();
-		init();
+		await init();
 
 		return true;
 	} catch (err: any) {
@@ -633,7 +798,7 @@ const handleCreateConfigClick = async () => {
 		const configPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
 		// 先应用默认配置到UI
-		applyConfig(defaultConfig);
+		await applyConfig(defaultConfig);
 
 		// 完整替换文件内容
 		await promises.writeFile(configPath, JSON.stringify(defaultConfig, null, 2), { encoding: 'utf8', flag: 'w' });
@@ -719,7 +884,7 @@ async function handleImport(filePath: string) {
 		// const projectPath = Editor.Project.path;
 		// const targetPath = `${projectPath}${ADAPTER_RC_PATH}`;
 
-		applyConfig(config);
+		await applyConfig(config);
 	} catch (err: any) {
 		logger.error(`导入配置失败: ${err.message}`);
 	}

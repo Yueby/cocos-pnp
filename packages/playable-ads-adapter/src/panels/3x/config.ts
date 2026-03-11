@@ -58,7 +58,13 @@ export const IDS = {
     CREATE_CONFIG: 'createConfig',
     BUILD: 'build',
     BUILDING_MASK: 'buildingMask',
-    STORE_CONTAINER: 'storeContainer'
+    STORE_CONTAINER: 'storeContainer',
+    VALIDATE_KEY: 'validateKey',
+    COMPRESSION_COUNT: 'compressionCount',
+    COMPRESSION_PROGRESS: 'compressionProgress',
+    COMPRESSION_MAX: 'compressionMax',
+    TINIFY_KEY_ROW: 'tinifyKeyRow',
+    TINIFY_VALIDATE_ROW: 'tinifyValidateRow'
 } as const;
 
 // 事件类型
@@ -110,6 +116,25 @@ export const STYLE = `
 .loading-text {
     margin-top: 10px;
     font-size: 14px;
+}
+
+.tinify-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+}
+.tinify-progress-row ui-progress {
+    flex: 1;
+}
+.tinify-count-label {
+    white-space: nowrap;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+.tinify-max-input {
+    width: 64px;
+    flex-shrink: 0;
 }
 
 `;
@@ -179,17 +204,24 @@ export const TEMPLATE = `
             <ui-checkbox slot="content" id="skipBuild"></ui-checkbox>
         </ui-prop>
         <ui-prop>
-            <ui-label slot="label" value="启用图片压缩"></ui-label>
-            <ui-checkbox slot="content" id="tinify"></ui-checkbox>
-        </ui-prop>
-        <ui-prop>
-            <ui-label slot="label" value="压缩API Key"></ui-label>
-            <ui-input slot="content" id="tinifyApiKey"></ui-input>
-        </ui-prop>
-        <ui-prop>
             <ui-label slot="label" value="启用Pako压缩"></ui-label>
             <ui-checkbox slot="content" id="isZip"></ui-checkbox>
         </ui-prop>
+        <ui-prop>
+            <ui-label slot="label" value="启用图片压缩"></ui-label>
+            <ui-checkbox slot="content" id="tinify"></ui-checkbox>
+        </ui-prop>
+        <ui-prop id="${IDS.TINIFY_KEY_ROW}">
+            <ui-label slot="label" value="压缩API Key"></ui-label>
+            <ui-input slot="content" id="tinifyApiKey"></ui-input>
+            <ui-button slot="content" id="${IDS.VALIDATE_KEY}">验证</ui-button>
+        </ui-prop>
+        <div id="${IDS.TINIFY_VALIDATE_ROW}" class="tinify-progress-row">
+            <ui-progress id="${IDS.COMPRESSION_PROGRESS}" value="0" percent></ui-progress>
+            <ui-label id="${IDS.COMPRESSION_COUNT}" value="已使用 0 /" class="tinify-count-label"></ui-label>
+            <ui-num-input id="${IDS.COMPRESSION_MAX}" value="500" min="1" step="1" preci="0" class="tinify-max-input"></ui-num-input>
+            <ui-label value="次" class="tinify-count-label"></ui-label>
+        </div>
 
         <div class="section-header">导出渠道配置</div>
         <div id="defaultTipContainer"></div>
@@ -263,6 +295,12 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
     [IDS.BUILD]: `#${IDS.BUILD}`,
     [IDS.BUILDING_MASK]: `#${IDS.BUILDING_MASK}`,
     [IDS.STORE_CONTAINER]: `#${IDS.STORE_CONTAINER}`,
+    [IDS.TINIFY_KEY_ROW]: `#${IDS.TINIFY_KEY_ROW}`,
+    [IDS.VALIDATE_KEY]: `#${IDS.VALIDATE_KEY}`,
+    [IDS.COMPRESSION_COUNT]: `#${IDS.COMPRESSION_COUNT}`,
+    [IDS.COMPRESSION_PROGRESS]: `#${IDS.COMPRESSION_PROGRESS}`,
+    [IDS.COMPRESSION_MAX]: `#${IDS.COMPRESSION_MAX}`,
+    [IDS.TINIFY_VALIDATE_ROW]: `#${IDS.TINIFY_VALIDATE_ROW}`,
 
     // 渠道相关选择器
     ...CHANNEL_OPTIONS.reduce(

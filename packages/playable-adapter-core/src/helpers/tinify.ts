@@ -1,76 +1,135 @@
 import { checkImgType, getAllFilesFormDir, getOriginPkgPath, getRCTinify, writeToPath } from "@/utils";
-import Axios from 'axios';
+import Axios, { AxiosError } from 'axios';
 import { readFileSync } from 'fs';
 
-// Upload file remotely
-const postFileToRemote = (filePath: string, data: Buffer): Promise<void> => {
-  const { tinifyApiKey } = getRCTinify()
-  return new Promise((resolve, reject) => {
-    Axios.request({
-      method: 'post',
-      url: 'https://api.tinify.com/shrink',
-      auth: {
-        username: `api:${tinifyApiKey}`,
-        password: '',
-      },
-      data
-    }).then((response) => {
-      Axios.request({
+const MAX_CONCURRENCY = 5;
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 2000;
+
+type TinifyErrorType = 'AccountError' | 'ClientError' | 'ServerError' | 'ConnectionError' | 'UnknownError';
+
+const classifyError = (err: unknown): { type: TinifyErrorType; retryable: boolean; message: string } => {
+  if (err instanceof AxiosError) {
+    if (!err.response) {
+      return { type: 'ConnectionError', retryable: true, message: `网络连接失败: ${err.message}` };
+    }
+    const status = err.response.status;
+    if (status === 401 || status === 429) {
+      const detail = status === 429 ? 'API 调用频率超限或月度配额已用尽' : 'API Key 无效或账户异常';
+      return { type: 'AccountError', retryable: false, message: `账户错误 (${status}): ${detail}` };
+    }
+    if (status >= 400 && status < 500) {
+      return { type: 'ClientError', retryable: false, message: `客户端错误 (${status}): 请求数据有误` };
+    }
+    if (status >= 500) {
+      return { type: 'ServerError', retryable: true, message: `服务端错误 (${status}): TinyPNG 服务暂时不可用` };
+    }
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return { type: 'UnknownError', retryable: false, message: msg };
+};
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+const postFileToRemote = async (filePath: string, data: Buffer): Promise<void> => {
+  const { tinifyApiKey } = getRCTinify();
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const uploadRes = await Axios.request({
+        method: 'post',
+        url: 'https://api.tinify.com/shrink',
+        auth: { username: `api:${tinifyApiKey}`, password: '' },
+        data,
+      });
+
+      const fileRes = await Axios.request({
         method: 'get',
-        url: response.data.output.url,
-        responseType: 'arraybuffer'
-      }).then((fileResponse) => {
-        const originalSize = data.length;
-        const compressedSize = fileResponse.data.length;
-        const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
-        
-        writeToPath(filePath, new Uint8Array(fileResponse.data))
-        console.info(`[压缩] ${filePath} (${(originalSize/1024).toFixed(1)}kb -> ${(compressedSize/1024).toFixed(1)}kb, -${ratio}%)`)
-        resolve()
-      }).catch((fileErr) => {
-        reject(fileErr)
-      })
-    }).catch((err) => {
-      reject(err)
-    })
-  })
-}
+        url: uploadRes.data.output.url,
+        responseType: 'arraybuffer',
+      });
 
-export const execTinify = async (): Promise<{ success: boolean, msg: string }> => {
-  const { tinify, tinifyApiKey } = getRCTinify()
-  // Whether to compress
+      const originalSize = data.length;
+      const compressedSize = fileRes.data.length;
+      const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
+
+      writeToPath(filePath, new Uint8Array(fileRes.data));
+      console.info(`[压缩] ${filePath} (${(originalSize / 1024).toFixed(1)}kb -> ${(compressedSize / 1024).toFixed(1)}kb, -${ratio}%)`);
+      return;
+    } catch (err) {
+      lastError = err;
+      const classified = classifyError(err);
+
+      if (!classified.retryable || attempt === MAX_RETRIES) {
+        throw new Error(`[${classified.type}] ${filePath}: ${classified.message}`);
+      }
+
+      const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+      console.warn(`[压缩] ${filePath} 第${attempt}次失败 (${classified.type}), ${delay}ms 后重试...`);
+      await sleep(delay);
+    }
+  }
+
+  throw lastError;
+};
+
+const runWithConcurrency = async <T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<PromiseSettledResult<T>[]> => {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let index = 0;
+
+  const worker = async () => {
+    while (index < tasks.length) {
+      const i = index++;
+      try {
+        results[i] = { status: 'fulfilled', value: await tasks[i]() };
+      } catch (err) {
+        results[i] = { status: 'rejected', reason: err };
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker()));
+  return results;
+};
+
+export const execTinify = async (): Promise<{ success: boolean; msg: string }> => {
+  const { tinify, tinifyApiKey } = getRCTinify();
+
   if (!tinify) {
-    return {
-      success: false,
-      msg: '未开启图片压缩'
-    }
+    return { success: false, msg: '未开启图片压缩' };
   }
 
-  // Whether there is an API key
   if (!tinifyApiKey) {
-    return {
-      success: false,
-      msg: '请提供 API key, 从这里获取: https://tinify.cn/developers'
+    return { success: false, msg: '请提供 API key, 从这里获取: https://tinify.cn/developers' };
+  }
+
+  const originPkgPath = getOriginPkgPath();
+  const files = getAllFilesFormDir(originPkgPath).filter(checkImgType);
+
+  if (files.length === 0) {
+    return { success: true, msg: '未发现需要压缩的图片' };
+  }
+
+  console.info(`[压缩] 共发现 ${files.length} 个图片文件，并发数: ${MAX_CONCURRENCY}`);
+
+  const tasks = files.map((filePath) => () => postFileToRemote(filePath, readFileSync(filePath)));
+  const results = await runWithConcurrency(tasks, MAX_CONCURRENCY);
+
+  const failed = results
+    .map((r, i) => ({ result: r, file: files[i] }))
+    .filter((item): item is { result: PromiseRejectedResult; file: string } => item.result.status === 'rejected');
+
+  if (failed.length > 0) {
+    for (const { result } of failed) {
+      console.error(`[压缩] ${result.reason}`);
     }
+    const succeeded = files.length - failed.length;
+    return {
+      success: succeeded > 0,
+      msg: `压缩完成: ${succeeded}/${files.length} 成功, ${failed.length} 失败`,
+    };
   }
 
-  // Original package path
-  const originPkgPath = getOriginPkgPath()
-  const files = getAllFilesFormDir(originPkgPath).filter((filePath) => {
-    return checkImgType(filePath)
-  })
-
-  console.info(`[压缩] 共发现 ${files.length} 个图片文件`);
-
-  let promiseList: Promise<void>[] = []
-  for (let index = 0; index < files.length; index++) {
-    const filePath = files[index];
-    promiseList.push(postFileToRemote(filePath, readFileSync(filePath)))
-  }
-  await Promise.all(promiseList)
-
-  return {
-    success: true,
-    msg: '压缩完成'
-  }
-}
+  return { success: true, msg: `压缩完成: ${files.length} 个文件全部成功` };
+};

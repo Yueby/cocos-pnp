@@ -1,9 +1,8 @@
 import { exec3xAdapter } from 'playable-adapter-core';
 import { parentPort, workerData } from 'worker_threads';
 
-// 重写console的log和info方法，使其在主线程中打印
 const overrideConsole = () => {
-	const { log, info } = console;
+	const { log, info, warn, error } = console;
 	console.log = (...args: any[]) => {
 		parentPort?.postMessage({
 			event: 'adapter:log',
@@ -13,16 +12,29 @@ const overrideConsole = () => {
 	};
 	console.info = (...args: any[]) => {
 		parentPort?.postMessage({
-			event: 'adapter:log',
+			event: 'adapter:info',
 			msg: args.join(' ')
 		});
 		info(...args);
+	};
+	console.warn = (...args: any[]) => {
+		parentPort?.postMessage({
+			event: 'adapter:warn',
+			msg: args.join(' ')
+		});
+		warn(...args);
+	};
+	console.error = (...args: any[]) => {
+		parentPort?.postMessage({
+			event: 'adapter:error',
+			msg: args.join(' ')
+		});
+		error(...args);
 	};
 };
 
 const task = async () => {
 	try {
-		// 重写console的log和info方法，使其在主线程中打印
 		overrideConsole();
 
 		const { buildFolderPath, adapterBuildConfig } = workerData;

@@ -70,6 +70,7 @@ export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
 		const handleExportFinished = () => {
 			const end = new Date().getTime();
 			console.log(`${BUILDER_NAME} 适配完成，共耗时${((end - start) / 1000).toFixed(0)}秒`);
+			Editor.Message.broadcast('adapter:build-finished');
 			resolve(true);
 		};
 		const handleExportError = (err: string) => {

@@ -59,6 +59,14 @@ declare namespace Editor {
 		sendToMain(event: TIpcMsgEvent, ...arg: any[]): void;
 	};
 
+	const Profile: {
+		getConfig(name: string, key?: string, type?: 'default' | 'global' | 'local'): Promise<any>;
+		setConfig(name: string, key: string, value: any, type?: 'default' | 'global' | 'local'): Promise<void>;
+		removeConfig(name: string, key: string, type?: 'default' | 'global' | 'local'): Promise<void>;
+		getProject(name: string, key?: string, type?: 'default' | 'project'): Promise<any>;
+		setProject(name: string, key: string, value: any, type?: 'default' | 'project'): Promise<void>;
+	};
+
 	function log(message?: any, ...optionalParams: any[]): void;
 	function error(message?: any, ...optionalParams: any[]): void;
 	function fatal(message?: any, ...optionalParams: any[]): void;
