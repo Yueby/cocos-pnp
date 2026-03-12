@@ -98,7 +98,14 @@ export async function ready(options: ITaskOptions) {
 
 		// 适配完成后自动刷新压缩用量
 		Editor.Message.addBroadcastListener('adapter:build-finished', () => {
-			setTimeout(() => handleValidateKeyClick(), 500);
+			setTimeout(async () => {
+				const keyPoolEnable = panel.$[IDS.KEY_POOL_ENABLE];
+				if (keyPoolEnable?.value === true) {
+					await handlePoolRefreshAfterBuild();
+				} else {
+					await handleValidateKeyClick();
+				}
+			}, 500);
 		});
 
 		// 监听语言更新消息
@@ -269,6 +276,203 @@ async function setCompressionMax(value: number): Promise<void> {
 	} catch (_) { /* ignore */ }
 }
 
+// --- 号池服务相关 ---
+const PROFILE_KEY_POOL_URL = 'keyPoolUrl';
+const PROFILE_KEY_POOL_TOKEN = 'keyPoolToken';
+
+async function getKeyPoolUrl(): Promise<string> {
+	try {
+		const val = await Editor.Profile.getConfig(PACKAGE_NAME, PROFILE_KEY_POOL_URL, 'global');
+		if (typeof val === 'string') return val;
+	} catch (_) { /* ignore */ }
+	return '';
+}
+
+async function setKeyPoolUrl(value: string): Promise<void> {
+	try {
+		await Editor.Profile.setConfig(PACKAGE_NAME, PROFILE_KEY_POOL_URL, value, 'global');
+	} catch (_) { /* ignore */ }
+}
+
+async function getKeyPoolToken(): Promise<string> {
+	try {
+		const val = await Editor.Profile.getConfig(PACKAGE_NAME, PROFILE_KEY_POOL_TOKEN, 'global');
+		if (typeof val === 'string') return val;
+	} catch (_) { /* ignore */ }
+	return '';
+}
+
+async function setKeyPoolToken(value: string): Promise<void> {
+	try {
+		await Editor.Profile.setConfig(PACKAGE_NAME, PROFILE_KEY_POOL_TOKEN, value, 'global');
+	} catch (_) { /* ignore */ }
+}
+
+function pickKeyFromPool(baseUrl: string, token: string): Promise<{
+	key: string;
+	monthly_usage: number;
+	monthly_limit: number;
+	remaining: number;
+}> {
+	return new Promise((resolve, reject) => {
+		const url = new URL('/pick', baseUrl);
+		const isHttps = url.protocol === 'https:';
+		const mod = isHttps ? https : require('http');
+
+		const req = mod.request(url.toString(), {
+			method: 'GET',
+			headers: { 'Authorization': `Bearer ${token}` }
+		}, (res: any) => {
+			let data = '';
+			res.on('data', (chunk: string) => data += chunk);
+			res.on('end', () => {
+				if (res.statusCode === 200) {
+					try {
+						const body = JSON.parse(data);
+						if (body.success && body.data) {
+							resolve(body.data);
+						} else {
+							reject(new Error('号池返回异常'));
+						}
+					} catch (e) {
+						reject(new Error('号池响应解析失败'));
+					}
+				} else if (res.statusCode === 503) {
+					reject(new Error('号池无可用 Key'));
+				} else {
+					reject(new Error(`号池请求失败: ${res.statusCode}`));
+				}
+			});
+		});
+		req.on('error', (e: Error) => reject(new Error(`号池连接失败: ${e.message}`)));
+		req.end();
+	});
+}
+
+function refreshKeyInPool(baseUrl: string, token: string, key: string): Promise<{
+	key: string;
+	monthly_usage: number;
+	monthly_limit: number;
+	remaining: number;
+	valid: boolean;
+}> {
+	return new Promise((resolve, reject) => {
+		const url = new URL('/pick/refresh', baseUrl);
+		const isHttps = url.protocol === 'https:';
+		const mod = isHttps ? https : require('http');
+		const payload = JSON.stringify({ key });
+
+		const req = mod.request(url.toString(), {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${token}`,
+				'Content-Type': 'application/json',
+				'Content-Length': Buffer.byteLength(payload)
+			}
+		}, (res: any) => {
+			let data = '';
+			res.on('data', (chunk: string) => data += chunk);
+			res.on('end', () => {
+				if (res.statusCode === 200) {
+					try {
+						const body = JSON.parse(data);
+						if (body.success && body.data) {
+							resolve(body.data);
+						} else {
+							reject(new Error('号池刷新返回异常'));
+						}
+					} catch (e) {
+						reject(new Error('号池刷新响应解析失败'));
+					}
+				} else if (res.statusCode === 404) {
+					reject(new Error('号池中不存在该 Key'));
+				} else {
+					reject(new Error(`号池刷新请求失败: ${res.statusCode}`));
+				}
+			});
+		});
+		req.on('error', (e: Error) => reject(new Error(`号池刷新连接失败: ${e.message}`)));
+		req.write(payload);
+		req.end();
+	});
+}
+
+const handlePoolRefreshAfterBuild = async () => {
+	const poolUrl = panel.$[IDS.KEY_POOL_URL]?.value?.trim();
+	const poolToken = panel.$[IDS.KEY_POOL_TOKEN]?.value?.trim();
+	const config = getOptions();
+	const apiKey = config.tinifyApiKey;
+
+	if (!poolUrl || !poolToken || !apiKey) return;
+
+	try {
+		const result = await refreshKeyInPool(poolUrl, poolToken, apiKey);
+		const max = result.monthly_limit || await getCompressionMax();
+		updateCompressionProgress(result.monthly_usage, max);
+	} catch (err: any) {
+		logger.warn('号池刷新失败:', err.message);
+		await handleValidateKeyClick();
+	}
+};
+
+const handleKeyPoolPickClick = async () => {
+	const poolUrl = panel.$[IDS.KEY_POOL_URL]?.value?.trim();
+	const poolToken = panel.$[IDS.KEY_POOL_TOKEN]?.value?.trim();
+	const pickBtn = panel.$[IDS.KEY_POOL_PICK];
+	const countLabel = panel.$[IDS.COMPRESSION_COUNT];
+
+	if (!poolUrl || !poolToken) {
+		if (countLabel) {
+			countLabel.setAttribute('value', '请填写号池地址和 Token');
+			countLabel.style.color = '#ff4d4f';
+		}
+		return;
+	}
+
+	pickBtn?.setAttribute('disabled', '');
+	if (countLabel) {
+		countLabel.setAttribute('value', '正在获取 Key...');
+		countLabel.style.color = '';
+	}
+
+	try {
+		await setKeyPoolUrl(poolUrl);
+		await setKeyPoolToken(poolToken);
+
+		const result = await pickKeyFromPool(poolUrl, poolToken);
+
+		const apiKeyInput = panel.$['tinifyApiKey'];
+		if (apiKeyInput) {
+			apiKeyInput.value = result.key;
+			panel.dispatch('update', `packages.${PACKAGE_NAME}.tinifyApiKey`, result.key);
+		}
+
+		const max = result.monthly_limit || await getCompressionMax();
+		if (result.monthly_limit) {
+			await setCompressionMax(result.monthly_limit);
+			const maxInput = panel.$[IDS.COMPRESSION_MAX];
+			if (maxInput) maxInput.setAttribute('value', String(result.monthly_limit));
+		}
+		updateCompressionProgress(result.monthly_usage, max);
+
+		if (countLabel) countLabel.style.color = '';
+	} catch (err: any) {
+		if (countLabel) {
+			countLabel.setAttribute('value', err.message);
+			countLabel.style.color = '#ff4d4f';
+		}
+	} finally {
+		pickBtn?.removeAttribute('disabled');
+	}
+};
+
+function updateKeyPoolVisibility(isVisible: boolean) {
+	const poolRow = panel.$[IDS.KEY_POOL_ROW];
+	if (poolRow) {
+		poolRow.style.display = isVisible ? '' : 'none';
+	}
+}
+
 let lastCompressionCount = -1;
 
 function updateCompressionProgress(count: number, max: number) {
@@ -426,6 +630,31 @@ async function initBaseConfig() {
 		setTimeout(() => handleValidateKeyClick(), 0);
 	}
 
+	// 号池服务
+	const keyPoolEnable = panel.$[IDS.KEY_POOL_ENABLE];
+	const keyPoolUrlInput = panel.$[IDS.KEY_POOL_URL];
+	const keyPoolTokenInput = panel.$[IDS.KEY_POOL_TOKEN];
+	const keyPoolPickBtn = panel.$[IDS.KEY_POOL_PICK];
+
+	keyPoolUrlInput.value = await getKeyPoolUrl();
+	keyPoolTokenInput.value = await getKeyPoolToken();
+
+	keyPoolEnable.addEventListener(EVENT_TYPES.CHANGE, (event: any) => {
+		updateKeyPoolVisibility(event.target.value === true);
+	});
+	updateKeyPoolVisibility(keyPoolEnable.value === true);
+
+	keyPoolUrlInput.addEventListener('confirm', async () => {
+		await setKeyPoolUrl(keyPoolUrlInput.value?.trim() || '');
+	});
+	keyPoolTokenInput.addEventListener('confirm', async () => {
+		await setKeyPoolToken(keyPoolTokenInput.value?.trim() || '');
+	});
+
+	keyPoolPickBtn.addEventListener(EVENT_TYPES.CLICK, handleKeyPoolPickClick);
+	keyPoolPickBtn.style.flex = '0 0 auto';
+	keyPoolPickBtn.style.marginLeft = '4px';
+
 	// 启用插屏
 	const enableSplash = panel.$['enableSplash'];
 	enableSplash.value = config.enableSplash;
@@ -451,6 +680,20 @@ function updateTinifyKeyVisibility(isVisible: boolean) {
 	const validateRow = panel.$[IDS.TINIFY_VALIDATE_ROW];
 	if (validateRow) {
 		validateRow.style.display = isVisible ? '' : 'none';
+	}
+
+	const keyPoolEnable = panel.$[IDS.KEY_POOL_ENABLE];
+	if (keyPoolEnable) {
+		const enableParent = keyPoolEnable.closest('ui-prop');
+		if (enableParent) {
+			(enableParent as HTMLElement).style.display = isVisible ? '' : 'none';
+		}
+	}
+
+	if (!isVisible) {
+		updateKeyPoolVisibility(false);
+	} else if (keyPoolEnable?.value === true) {
+		updateKeyPoolVisibility(true);
 	}
 }
 

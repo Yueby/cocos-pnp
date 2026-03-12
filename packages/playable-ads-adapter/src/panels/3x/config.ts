@@ -64,7 +64,12 @@ export const IDS = {
     COMPRESSION_PROGRESS: 'compressionProgress',
     COMPRESSION_MAX: 'compressionMax',
     TINIFY_KEY_ROW: 'tinifyKeyRow',
-    TINIFY_VALIDATE_ROW: 'tinifyValidateRow'
+    TINIFY_VALIDATE_ROW: 'tinifyValidateRow',
+    KEY_POOL_ENABLE: 'keyPoolEnable',
+    KEY_POOL_ROW: 'keyPoolRow',
+    KEY_POOL_URL: 'keyPoolUrl',
+    KEY_POOL_TOKEN: 'keyPoolToken',
+    KEY_POOL_PICK: 'keyPoolPick'
 } as const;
 
 // 事件类型
@@ -222,6 +227,21 @@ export const TEMPLATE = `
             <ui-num-input id="${IDS.COMPRESSION_MAX}" value="500" min="1" step="1" preci="0" class="tinify-max-input"></ui-num-input>
             <ui-label value="次" class="tinify-count-label"></ui-label>
         </div>
+        <ui-prop>
+            <ui-label slot="label" value="启用号池服务"></ui-label>
+            <ui-checkbox slot="content" id="${IDS.KEY_POOL_ENABLE}"></ui-checkbox>
+        </ui-prop>
+        <div id="${IDS.KEY_POOL_ROW}">
+            <ui-prop>
+                <ui-label slot="label" value="号池地址"></ui-label>
+                <ui-input slot="content" id="${IDS.KEY_POOL_URL}" placeholder="https://tinypool.example.dev"></ui-input>
+            </ui-prop>
+            <ui-prop>
+                <ui-label slot="label" value="API Token"></ui-label>
+                <ui-input slot="content" id="${IDS.KEY_POOL_TOKEN}" type="password" placeholder="API Token"></ui-input>
+                <ui-button slot="content" id="${IDS.KEY_POOL_PICK}">获取Key</ui-button>
+            </ui-prop>
+        </div>
 
         <div class="section-header">导出渠道配置</div>
         <div id="defaultTipContainer"></div>
@@ -301,6 +321,11 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
     [IDS.COMPRESSION_PROGRESS]: `#${IDS.COMPRESSION_PROGRESS}`,
     [IDS.COMPRESSION_MAX]: `#${IDS.COMPRESSION_MAX}`,
     [IDS.TINIFY_VALIDATE_ROW]: `#${IDS.TINIFY_VALIDATE_ROW}`,
+    [IDS.KEY_POOL_ENABLE]: `#${IDS.KEY_POOL_ENABLE}`,
+    [IDS.KEY_POOL_ROW]: `#${IDS.KEY_POOL_ROW}`,
+    [IDS.KEY_POOL_URL]: `#${IDS.KEY_POOL_URL}`,
+    [IDS.KEY_POOL_TOKEN]: `#${IDS.KEY_POOL_TOKEN}`,
+    [IDS.KEY_POOL_PICK]: `#${IDS.KEY_POOL_PICK}`,
 
     // 渠道相关选择器
     ...CHANNEL_OPTIONS.reduce(
