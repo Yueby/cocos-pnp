@@ -96,13 +96,11 @@ export async function ready(options: ITaskOptions) {
 		// 初始化构建状态监听器
 		initBuildStateListener();
 
-		// 适配完成后自动刷新压缩用量
+		// 适配完成后自动刷新压缩用量（只要号池配置存在就尝试刷新，无论开关状态）
 		Editor.Message.addBroadcastListener('adapter:build-finished', () => {
 			setTimeout(async () => {
-				const keyPoolEnable = panel.$[IDS.KEY_POOL_ENABLE];
-				if (keyPoolEnable?.value === true) {
-					await handlePoolRefreshAfterBuild();
-				} else {
+				const refreshed = await handlePoolRefreshAfterBuild();
+				if (!refreshed) {
 					await handleValidateKeyClick();
 				}
 			}, 500);
@@ -259,54 +257,27 @@ const handleIsZipChange = (event: any) => {
 	panel.dispatch('update', `packages.${PACKAGE_NAME}.isZip`, event.target.value);
 };
 
-const PROFILE_KEY_COMPRESSION_MAX = 'tinifyCompressionMax';
-const DEFAULT_COMPRESSION_MAX = 500;
-
-async function getCompressionMax(): Promise<number> {
+// --- Editor.Profile 通用读写 ---
+async function profileGet<T>(key: string, fallback: T): Promise<T> {
 	try {
-		const val = await Editor.Profile.getConfig(PACKAGE_NAME, PROFILE_KEY_COMPRESSION_MAX, 'global');
-		if (typeof val === 'number' && val > 0) return val;
+		const val = await Editor.Profile.getConfig(PACKAGE_NAME, key, 'global');
+		if (val != null) return val as T;
 	} catch (_) { /* ignore */ }
-	return DEFAULT_COMPRESSION_MAX;
+	return fallback;
 }
 
-async function setCompressionMax(value: number): Promise<void> {
+async function profileSet(key: string, value: any): Promise<void> {
 	try {
-		await Editor.Profile.setConfig(PACKAGE_NAME, PROFILE_KEY_COMPRESSION_MAX, Math.max(1, value), 'global');
+		await Editor.Profile.setConfig(PACKAGE_NAME, key, value, 'global');
 	} catch (_) { /* ignore */ }
 }
 
-// --- 号池服务相关 ---
-const PROFILE_KEY_POOL_URL = 'keyPoolUrl';
-const PROFILE_KEY_POOL_TOKEN = 'keyPoolToken';
-
-async function getKeyPoolUrl(): Promise<string> {
-	try {
-		const val = await Editor.Profile.getConfig(PACKAGE_NAME, PROFILE_KEY_POOL_URL, 'global');
-		if (typeof val === 'string') return val;
-	} catch (_) { /* ignore */ }
-	return '';
-}
-
-async function setKeyPoolUrl(value: string): Promise<void> {
-	try {
-		await Editor.Profile.setConfig(PACKAGE_NAME, PROFILE_KEY_POOL_URL, value, 'global');
-	} catch (_) { /* ignore */ }
-}
-
-async function getKeyPoolToken(): Promise<string> {
-	try {
-		const val = await Editor.Profile.getConfig(PACKAGE_NAME, PROFILE_KEY_POOL_TOKEN, 'global');
-		if (typeof val === 'string') return val;
-	} catch (_) { /* ignore */ }
-	return '';
-}
-
-async function setKeyPoolToken(value: string): Promise<void> {
-	try {
-		await Editor.Profile.setConfig(PACKAGE_NAME, PROFILE_KEY_POOL_TOKEN, value, 'global');
-	} catch (_) { /* ignore */ }
-}
+const PROFILE_KEYS = {
+	compressionMax: 'tinifyCompressionMax',
+	poolEnable: 'keyPoolEnable',
+	poolUrl: 'keyPoolUrl',
+	poolToken: 'keyPoolToken',
+} as const;
 
 function pickKeyFromPool(baseUrl: string, token: string): Promise<{
 	key: string;
@@ -385,7 +356,9 @@ function refreshKeyInPool(baseUrl: string, token: string, key: string): Promise<
 						reject(new Error('号池刷新响应解析失败'));
 					}
 				} else if (res.statusCode === 404) {
-					reject(new Error('号池中不存在该 Key'));
+					const err = new Error('号池中不存在该 Key');
+					(err as any).keyNotInPool = true;
+					reject(err);
 				} else {
 					reject(new Error(`号池刷新请求失败: ${res.statusCode}`));
 				}
@@ -397,21 +370,46 @@ function refreshKeyInPool(baseUrl: string, token: string, key: string): Promise<
 	});
 }
 
-const handlePoolRefreshAfterBuild = async () => {
-	const poolUrl = panel.$[IDS.KEY_POOL_URL]?.value?.trim();
-	const poolToken = panel.$[IDS.KEY_POOL_TOKEN]?.value?.trim();
+const applyPickedKey = async (poolUrl: string, poolToken: string) => {
+	const result = await pickKeyFromPool(poolUrl, poolToken);
+	const apiKeyInput = panel.$['tinifyApiKey'];
+	if (apiKeyInput) {
+		apiKeyInput.value = result.key;
+		panel.dispatch('update', `packages.${PACKAGE_NAME}.tinifyApiKey`, result.key);
+	}
+	const max = result.monthly_limit || await profileGet<number>(PROFILE_KEYS.compressionMax, 500);
+	if (result.monthly_limit) {
+		await profileSet(PROFILE_KEYS.compressionMax, result.monthly_limit);
+		const maxInput = panel.$[IDS.COMPRESSION_MAX];
+		if (maxInput) maxInput.setAttribute('value', String(result.monthly_limit));
+	}
+	updateCompressionProgress(result.monthly_usage, max);
+	logger.info(`已自动切换至新 Key: ${result.key.slice(0, 8)}...（剩余 ${result.remaining} 次）`);
+};
+
+const handlePoolRefreshAfterBuild = async (): Promise<boolean> => {
+	const poolUrl = (panel.$[IDS.KEY_POOL_URL]?.value?.trim()) || await profileGet<string>(PROFILE_KEYS.poolUrl, '');
+	const poolToken = (panel.$[IDS.KEY_POOL_TOKEN]?.value?.trim()) || await profileGet<string>(PROFILE_KEYS.poolToken, '');
 	const config = getOptions();
 	const apiKey = config.tinifyApiKey;
 
-	if (!poolUrl || !poolToken || !apiKey) return;
+	if (!poolUrl || !poolToken || !apiKey) return false;
 
 	try {
 		const result = await refreshKeyInPool(poolUrl, poolToken, apiKey);
-		const max = result.monthly_limit || await getCompressionMax();
+		const max = result.monthly_limit || await profileGet<number>(PROFILE_KEYS.compressionMax, 500);
 		updateCompressionProgress(result.monthly_usage, max);
+
+		const poolEnabled = panel.$[IDS.KEY_POOL_ENABLE]?.value === true;
+		if ((result.remaining <= 0 || !result.valid) && poolEnabled) {
+			logger.warn(`当前 Key 额度已用尽或失效，正在从号池获取新 Key...`);
+			await applyPickedKey(poolUrl, poolToken);
+		}
+		return true;
 	} catch (err: any) {
+		if (err.keyNotInPool) return false;
 		logger.warn('号池刷新失败:', err.message);
-		await handleValidateKeyClick();
+		return false;
 	}
 };
 
@@ -436,25 +434,9 @@ const handleKeyPoolPickClick = async () => {
 	}
 
 	try {
-		await setKeyPoolUrl(poolUrl);
-		await setKeyPoolToken(poolToken);
-
-		const result = await pickKeyFromPool(poolUrl, poolToken);
-
-		const apiKeyInput = panel.$['tinifyApiKey'];
-		if (apiKeyInput) {
-			apiKeyInput.value = result.key;
-			panel.dispatch('update', `packages.${PACKAGE_NAME}.tinifyApiKey`, result.key);
-		}
-
-		const max = result.monthly_limit || await getCompressionMax();
-		if (result.monthly_limit) {
-			await setCompressionMax(result.monthly_limit);
-			const maxInput = panel.$[IDS.COMPRESSION_MAX];
-			if (maxInput) maxInput.setAttribute('value', String(result.monthly_limit));
-		}
-		updateCompressionProgress(result.monthly_usage, max);
-
+		await profileSet(PROFILE_KEYS.poolUrl, poolUrl);
+		await profileSet(PROFILE_KEYS.poolToken, poolToken);
+		await applyPickedKey(poolUrl, poolToken);
 		if (countLabel) countLabel.style.color = '';
 	} catch (err: any) {
 		if (countLabel) {
@@ -501,7 +483,7 @@ const handleCompressionMaxChange = async (event: any) => {
 	const raw = event.target.value ?? event.detail?.value;
 	const val = parseInt(raw, 10);
 	if (val > 0) {
-		await setCompressionMax(val);
+		await profileSet(PROFILE_KEYS.compressionMax, val);
 		await handleValidateKeyClick();
 	}
 };
@@ -525,7 +507,7 @@ const handleValidateKeyClick = async () => {
 
 	try {
 		const result = await validateTinifyApiKey(apiKey);
-		const max = await getCompressionMax();
+		const max = await profileGet<number>(PROFILE_KEYS.compressionMax, 500);
 
 		if (result.valid) {
 			const count = result.exceeded && result.count === 0 ? max : result.count;
@@ -615,7 +597,7 @@ async function initBaseConfig() {
 
 	// 配额上限输入框
 	const compressionMaxInput = panel.$[IDS.COMPRESSION_MAX];
-	compressionMaxInput.setAttribute('value', String(await getCompressionMax()));
+	compressionMaxInput.setAttribute('value', String(await profileGet<number>(PROFILE_KEYS.compressionMax, 500)));
 	compressionMaxInput.addEventListener('confirm', handleCompressionMaxChange);
 	compressionMaxInput.addEventListener('change', handleCompressionMaxChange);
 
@@ -636,19 +618,23 @@ async function initBaseConfig() {
 	const keyPoolTokenInput = panel.$[IDS.KEY_POOL_TOKEN];
 	const keyPoolPickBtn = panel.$[IDS.KEY_POOL_PICK];
 
-	keyPoolUrlInput.value = await getKeyPoolUrl();
-	keyPoolTokenInput.value = await getKeyPoolToken();
+	const savedPoolEnable = await profileGet<boolean>(PROFILE_KEYS.poolEnable, false);
+	keyPoolEnable.value = savedPoolEnable;
+	keyPoolUrlInput.value = await profileGet<string>(PROFILE_KEYS.poolUrl, '');
+	keyPoolTokenInput.value = await profileGet<string>(PROFILE_KEYS.poolToken, '');
 
-	keyPoolEnable.addEventListener(EVENT_TYPES.CHANGE, (event: any) => {
-		updateKeyPoolVisibility(event.target.value === true);
+	keyPoolEnable.addEventListener(EVENT_TYPES.CHANGE, async (event: any) => {
+		const enabled = event.target.value === true;
+		await profileSet(PROFILE_KEYS.poolEnable, enabled);
+		updateKeyPoolVisibility(enabled);
 	});
-	updateKeyPoolVisibility(keyPoolEnable.value === true);
+	updateKeyPoolVisibility(savedPoolEnable);
 
 	keyPoolUrlInput.addEventListener('confirm', async () => {
-		await setKeyPoolUrl(keyPoolUrlInput.value?.trim() || '');
+		await profileSet(PROFILE_KEYS.poolUrl, keyPoolUrlInput.value?.trim() || '');
 	});
 	keyPoolTokenInput.addEventListener('confirm', async () => {
-		await setKeyPoolToken(keyPoolTokenInput.value?.trim() || '');
+		await profileSet(PROFILE_KEYS.poolToken, keyPoolTokenInput.value?.trim() || '');
 	});
 
 	keyPoolPickBtn.addEventListener(EVENT_TYPES.CLICK, handleKeyPoolPickClick);
