@@ -13,6 +13,9 @@ import { HTMLCustomElement, ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCusto
 
 let panel: ICustomPanelThis;
 let unsubscribeBuildState: (() => void) | null = null;
+let _eventsInitialized = false;
+let _buildFinishedHandler: (() => void) | null = null;
+let _updateLanguageHandler: ((lang: string) => void) | null = null;
 
 export const style = STYLE;
 export const template = TEMPLATE;
@@ -96,32 +99,29 @@ export async function ready(options: ITaskOptions) {
 		// 初始化构建状态监听器
 		initBuildStateListener();
 
-		// 适配完成后自动刷新压缩用量（只要号池配置存在就尝试刷新，无论开关状态）
-		Editor.Message.addBroadcastListener('adapter:build-finished', () => {
+		_buildFinishedHandler = () => {
 			setTimeout(async () => {
 				const refreshed = await handlePoolRefreshAfterBuild();
 				if (!refreshed) {
 					await handleValidateKeyClick();
 				}
 			}, 500);
-		});
+		};
+		Editor.Message.addBroadcastListener('adapter:build-finished', _buildFinishedHandler);
 
-		// 监听语言更新消息
-		Editor.Message.addBroadcastListener('update-panel-language', (lang: string) => {
-
+		_updateLanguageHandler = (lang: string) => {
 			const config = getOptions();
 			config.lang = lang;
 
-			// 更新UI显示
 			const langInput = panel.$['lang'];
 			if (langInput) {
 				langInput.value = lang;
 			}
 
-			// 保存配置
 			setOptions(config);
 			logger.log('面板语言已更新为:', lang);
-		});
+		};
+		Editor.Message.addBroadcastListener('update-panel-language', _updateLanguageHandler);
 
 		// 读取配置文件
 		const config = readAdapterRCFileForPanel();
@@ -145,20 +145,23 @@ export async function ready(options: ITaskOptions) {
  */
 export async function update(options: ITaskOptions, key: string) {
 	try {
-		// 先应用配置到UI
 		const config = options.packages[PACKAGE_NAME];
 		if (config) {
+			const current = getOptions();
+			if (current.tinifySkipUuids && !config.tinifySkipUuids) {
+				config.tinifySkipUuids = current.tinifySkipUuids;
+			}
 			await applyConfig(config);
+			await saveConfigToFile(config);
+		} else {
+			if (!key) {
+				await init();
+			} else {
+				logger.warn(`update() 收到 key "${key}" 但 config 不存在，已忽略`);
+			}
 		}
-
-		// 然后保存到文件
-		await saveConfigToFile(config);
 	} catch (err: any) {
 		logger.error('更新配置失败:', err.message);
-	}
-
-	if (!key) {
-		await init();
 	}
 }
 
@@ -171,10 +174,20 @@ export function close() {
 	}
 
 	try {
-		// 清理构建状态监听器
+		_eventsInitialized = false;
+
 		if (unsubscribeBuildState) {
 			unsubscribeBuildState();
 			unsubscribeBuildState = null;
+		}
+
+		if (_buildFinishedHandler) {
+			Editor.Message.removeBroadcastListener('adapter:build-finished', _buildFinishedHandler);
+			_buildFinishedHandler = null;
+		}
+		if (_updateLanguageHandler) {
+			Editor.Message.removeBroadcastListener('update-panel-language', _updateLanguageHandler);
+			_updateLanguageHandler = null;
 		}
 
 		// 移除根元素
@@ -531,45 +544,51 @@ async function initBaseConfig() {
 	const baseFields = ['fileName', 'lang', 'title', 'iosUrl', 'androidUrl', 'buildPlatform', 'tinifyApiKey'] as const;
 	baseFields.forEach((field) => {
 		const input: HTMLCustomElement = panel.$[field];
-		// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查 input 是否存在
 		input.value = config[field] ?? '';
-		addEventListenerWithDispatch(input, 'confirm', field);
+		if (!_eventsInitialized) {
+			addEventListenerWithDispatch(input, 'confirm', field);
+		}
 	});
 
 	// 商店配置路径
 	const storePath = panel.$['storePath'];
 	if (storePath) {
 		storePath.value = config.storePath ?? '';
-		storePath.addEventListener(EVENT_TYPES.CHANGE, async (event: any) => {
-			const path = event.target.value;
-			// 更新配置
-			panel.dispatch('update', `packages.${PACKAGE_NAME}.storePath`, path);
+		if (!_eventsInitialized) {
+			storePath.addEventListener(EVENT_TYPES.CHANGE, async (event: any) => {
+				const path = event.target.value;
+				panel.dispatch('update', `packages.${PACKAGE_NAME}.storePath`, path);
 
-			// 如果路径存在，读取并更新商店配置
-			if (path) {
-				try {
-					const storeConfig = await readStoreConfig(path);
-					createStoreSection(storeConfig);
-				} catch (err) {
-					logger.error('处理商店配置失败:', err);
+				if (path) {
+					try {
+						const storeConfig = await readStoreConfig(path);
+						createStoreSection(storeConfig);
+					} catch (err) {
+						logger.error('处理商店配置失败:', err);
+					}
+				} else {
+					createStoreSection([]);
 				}
-			} else {
-				// 如果路径为空，清空商店配置区域
-				createStoreSection([]);
-			}
-		});
+			});
+		}
 	}
 
 	// 屏幕方向
-	// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查 orientation 是否存在
 	panel.$['orientation'].value = config.orientation ?? CONFIG.DEFAULT_ORIENTATION;
-	addEventListenerWithDispatch(panel.$['orientation'], 'change', 'orientation');
+	if (!_eventsInitialized) {
+		addEventListenerWithDispatch(panel.$['orientation'], 'change', 'orientation');
+	}
 
 	// 启用图片压缩
 	const tinify = panel.$['tinify'];
 	tinify.value = config.tinify;
 	tinify.addEventListener(EVENT_TYPES.CHANGE, handleTinifyChange);
 	updateTinifyKeyVisibility(config.tinify === true);
+
+	// 跳过压缩 UUID 列表
+	initSkipUuidsList(config.tinifySkipUuids || []);
+	const addBtn = panel.$['tinifySkipUuidsAdd'];
+	addBtn.onclick = () => addSkipUuidRow('');
 
 	// 验证 API Key 按钮
 	const validateBtn = panel.$[IDS.VALIDATE_KEY];
@@ -591,9 +610,11 @@ async function initBaseConfig() {
 	}
 
 	// API Key 输入确认后自动验证
-	tinifyApiKeyInput.addEventListener('confirm', () => {
-		setTimeout(() => handleValidateKeyClick(), 0);
-	});
+	if (!_eventsInitialized) {
+		tinifyApiKeyInput.addEventListener('confirm', () => {
+			setTimeout(() => handleValidateKeyClick(), 0);
+		});
+	}
 
 	// 配额上限输入框
 	const compressionMaxInput = panel.$[IDS.COMPRESSION_MAX];
@@ -623,19 +644,20 @@ async function initBaseConfig() {
 	keyPoolUrlInput.value = await profileGet<string>(PROFILE_KEYS.poolUrl, '');
 	keyPoolTokenInput.value = await profileGet<string>(PROFILE_KEYS.poolToken, '');
 
-	keyPoolEnable.addEventListener(EVENT_TYPES.CHANGE, async (event: any) => {
-		const enabled = event.target.value === true;
-		await profileSet(PROFILE_KEYS.poolEnable, enabled);
-		updateKeyPoolVisibility(enabled);
-	});
+	if (!_eventsInitialized) {
+		keyPoolEnable.addEventListener(EVENT_TYPES.CHANGE, async (event: any) => {
+			const enabled = event.target.value === true;
+			await profileSet(PROFILE_KEYS.poolEnable, enabled);
+			updateKeyPoolVisibility(enabled);
+		});
+		keyPoolUrlInput.addEventListener('confirm', async () => {
+			await profileSet(PROFILE_KEYS.poolUrl, keyPoolUrlInput.value?.trim() || '');
+		});
+		keyPoolTokenInput.addEventListener('confirm', async () => {
+			await profileSet(PROFILE_KEYS.poolToken, keyPoolTokenInput.value?.trim() || '');
+		});
+	}
 	updateKeyPoolVisibility(savedPoolEnable);
-
-	keyPoolUrlInput.addEventListener('confirm', async () => {
-		await profileSet(PROFILE_KEYS.poolUrl, keyPoolUrlInput.value?.trim() || '');
-	});
-	keyPoolTokenInput.addEventListener('confirm', async () => {
-		await profileSet(PROFILE_KEYS.poolToken, keyPoolTokenInput.value?.trim() || '');
-	});
 
 	keyPoolPickBtn.addEventListener(EVENT_TYPES.CLICK, handleKeyPoolPickClick);
 	keyPoolPickBtn.style.flex = '0 0 auto';
@@ -657,6 +679,79 @@ async function initBaseConfig() {
 	isZip.addEventListener(EVENT_TYPES.CHANGE, handleIsZipChange);
 }
 
+function collectSkipUuids(): string[] {
+	const list = panel.$['tinifySkipUuidsList'];
+	if (!list || !(list instanceof HTMLElement)) return [];
+	const uuids: string[] = [];
+	list.querySelectorAll('ui-asset').forEach((asset: any) => {
+		const val = asset.value;
+		if (val) uuids.push(val);
+	});
+	return uuids;
+}
+
+function dispatchSkipUuids() {
+	const uuids = collectSkipUuids();
+	const config = getOptions();
+	config.tinifySkipUuids = uuids;
+	panel.options.packages[PACKAGE_NAME] = config;
+	panel.dispatch('update', `packages.${PACKAGE_NAME}.tinifySkipUuids`, uuids);
+	saveConfigToFile(config).catch((err: any) => {
+		logger.error('保存跳过 UUID 配置失败:', err.message);
+	});
+}
+
+function refreshSkipUuidIndices() {
+	const list = panel.$['tinifySkipUuidsList'];
+	if (!list || !(list instanceof HTMLElement)) return;
+	const rows = list.querySelectorAll('.skip-uuid-row');
+	rows.forEach((row, i) => {
+		const idx = row.querySelector('.skip-uuid-index');
+		if (idx) idx.textContent = String(i + 1);
+	});
+}
+
+function addSkipUuidRow(uuid: string) {
+	const list = panel.$['tinifySkipUuidsList'];
+	if (!list || !(list instanceof HTMLElement)) return;
+
+	const row = document.createElement('div');
+	row.className = 'skip-uuid-row';
+
+	const index = document.createElement('span');
+	index.className = 'skip-uuid-index';
+
+	const asset = document.createElement('ui-asset') as any;
+	asset.setAttribute('droppable', 'cc.ImageAsset');
+	if (uuid) asset.value = uuid;
+	asset.addEventListener('confirm', () => dispatchSkipUuids());
+	asset.addEventListener('change', () => dispatchSkipUuids());
+
+	const removeBtn = document.createElement('ui-button') as any;
+	removeBtn.textContent = '×';
+	removeBtn.className = 'skip-uuid-remove';
+	removeBtn.setAttribute('tooltip', '移除');
+	removeBtn.onclick = () => {
+		row.remove();
+		refreshSkipUuidIndices();
+		dispatchSkipUuids();
+	};
+
+	row.appendChild(index);
+	row.appendChild(asset);
+	row.appendChild(removeBtn);
+	list.appendChild(row);
+
+	refreshSkipUuidIndices();
+}
+
+function initSkipUuidsList(uuids: string[]) {
+	const list = panel.$['tinifySkipUuidsList'];
+	if (!list || !(list instanceof HTMLElement)) return;
+	list.innerHTML = '';
+	uuids.forEach((uuid) => addSkipUuidRow(uuid));
+}
+
 function updateTinifyKeyVisibility(isVisible: boolean) {
 	const keyRow = panel.$[IDS.TINIFY_KEY_ROW];
 	if (keyRow) {
@@ -666,6 +761,11 @@ function updateTinifyKeyVisibility(isVisible: boolean) {
 	const validateRow = panel.$[IDS.TINIFY_VALIDATE_ROW];
 	if (validateRow) {
 		validateRow.style.display = isVisible ? '' : 'none';
+	}
+
+	const skipUuidsRow = panel.$[IDS.TINIFY_SKIP_UUIDS_ROW];
+	if (skipUuidsRow) {
+		skipUuidsRow.style.display = isVisible ? '' : 'none';
 	}
 
 	const keyPoolEnable = panel.$[IDS.KEY_POOL_ENABLE];
@@ -690,8 +790,10 @@ function initChannels() {
 	CHANNEL_OPTIONS.forEach((channel) => {
 		const button = panel.$[channel];
 		button.setAttribute('type', selectedChannels.includes(channel) ? 'primary' : 'default');
-		button.addEventListener('click', onChannelClick);
-		addChannelInputListeners(channel);
+		if (!_eventsInitialized) {
+			button.addEventListener('click', onChannelClick);
+			addChannelInputListeners(channel);
+		}
 	});
 }
 
@@ -720,6 +822,7 @@ async function init() {
 	updateInjectOptions();
 	updateDefaultTip();
 	updateChannelTips();
+	_eventsInitialized = true;
 }
 
 function updateInjectOptions() {
@@ -992,6 +1095,7 @@ function createDefaultConfig(): TAdapterRC {
 		androidUrl: '',
 		tinify: false,
 		tinifyApiKey: '',
+		tinifySkipUuids: [],
 		enableSplash: false,
 		skipBuild: false,
 		isZip: false

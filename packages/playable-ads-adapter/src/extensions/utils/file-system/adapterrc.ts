@@ -101,18 +101,20 @@ export const getRCSkipBuild = (): boolean => {
 	return adapterRCJson.skipBuild ?? false;
 };
 
-export const getRCTinify = (): { tinify: boolean; tinifyApiKey: string; } => {
+export const getRCTinify = (): { tinify: boolean; tinifyApiKey: string; tinifySkipUuids: string[] } => {
 	const adapterRCJson = getAdapterRCJson();
 	if (!adapterRCJson) {
 		return {
 			tinify: false,
-			tinifyApiKey: ''
+			tinifyApiKey: '',
+			tinifySkipUuids: []
 		};
 	}
 
 	return {
 		tinify: !!adapterRCJson.tinify,
-		tinifyApiKey: adapterRCJson.tinifyApiKey || ''
+		tinifyApiKey: adapterRCJson.tinifyApiKey || '',
+		tinifySkipUuids: adapterRCJson.tinifySkipUuids || []
 	};
 };
 

@@ -65,6 +65,7 @@ export const IDS = {
     COMPRESSION_MAX: 'compressionMax',
     TINIFY_KEY_ROW: 'tinifyKeyRow',
     TINIFY_VALIDATE_ROW: 'tinifyValidateRow',
+    TINIFY_SKIP_UUIDS_ROW: 'tinifySkipUuidsRow',
     KEY_POOL_ENABLE: 'keyPoolEnable',
     KEY_POOL_ROW: 'keyPoolRow',
     KEY_POOL_URL: 'keyPoolUrl',
@@ -141,6 +142,42 @@ export const STYLE = `
     width: 64px;
     flex-shrink: 0;
 }
+.skip-uuid-list {
+    padding: 4px 0 4px 8px;
+}
+.skip-uuid-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+}
+.skip-uuid-row .skip-uuid-index {
+    flex: 0 0 20px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--color-default);
+    opacity: 0.6;
+}
+.skip-uuid-row ui-asset {
+    flex: 1;
+    min-width: 0;
+}
+.skip-uuid-row .skip-uuid-remove {
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    line-height: 22px;
+    text-align: center;
+    font-size: 14px;
+}
+.skip-uuid-empty {
+    padding: 8px 0;
+    font-size: 11px;
+    color: var(--color-default);
+    opacity: 0.5;
+    text-align: center;
+}
 
 `;
 
@@ -216,6 +253,13 @@ export const TEMPLATE = `
             <ui-label slot="label" value="启用图片压缩"></ui-label>
             <ui-checkbox slot="content" id="tinify"></ui-checkbox>
         </ui-prop>
+        <div id="${IDS.TINIFY_SKIP_UUIDS_ROW}">
+            <ui-prop>
+                <ui-label slot="label" value="跳过压缩资源" tooltip="拖入不需要压缩的图片资源，压缩时将跳过这些资源"></ui-label>
+                <ui-button slot="content" id="tinifySkipUuidsAdd" class="small" tooltip="添加跳过项">+</ui-button>
+            </ui-prop>
+            <div id="tinifySkipUuidsList" class="skip-uuid-list"></div>
+        </div>
         <ui-prop id="${IDS.TINIFY_KEY_ROW}">
             <ui-label slot="label" value="压缩API Key"></ui-label>
             <ui-input slot="content" id="tinifyApiKey"></ui-input>
@@ -295,6 +339,8 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
     orientation: '#orientation',
     tinify: '#tinify',
     tinifyApiKey: '#tinifyApiKey',
+    tinifySkipUuidsAdd: '#tinifySkipUuidsAdd',
+    tinifySkipUuidsList: '#tinifySkipUuidsList',
     enableSplash: '#enableSplash',
     skipBuild: '#skipBuild',
     isZip: '#isZip',
@@ -321,6 +367,7 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
     [IDS.COMPRESSION_PROGRESS]: `#${IDS.COMPRESSION_PROGRESS}`,
     [IDS.COMPRESSION_MAX]: `#${IDS.COMPRESSION_MAX}`,
     [IDS.TINIFY_VALIDATE_ROW]: `#${IDS.TINIFY_VALIDATE_ROW}`,
+    [IDS.TINIFY_SKIP_UUIDS_ROW]: `#${IDS.TINIFY_SKIP_UUIDS_ROW}`,
     [IDS.KEY_POOL_ENABLE]: `#${IDS.KEY_POOL_ENABLE}`,
     [IDS.KEY_POOL_ROW]: `#${IDS.KEY_POOL_ROW}`,
     [IDS.KEY_POOL_URL]: `#${IDS.KEY_POOL_URL}`,

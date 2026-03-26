@@ -1,6 +1,7 @@
 import { checkImgType, getAllFilesFormDir, getOriginPkgPath, getRCTinify, writeToPath } from "@/utils";
 import Axios, { AxiosError } from 'axios';
 import { readFileSync } from 'fs';
+import path from 'path';
 
 const MAX_CONCURRENCY = 5;
 const MAX_RETRIES = 3;
@@ -93,8 +94,14 @@ const runWithConcurrency = async <T>(tasks: (() => Promise<T>)[], concurrency: n
   return results;
 };
 
+const isUuidSkipped = (filePath: string, skipUuids: string[]): boolean => {
+  if (skipUuids.length === 0) return false;
+  const baseName = path.basename(filePath, path.extname(filePath));
+  return skipUuids.includes(baseName);
+};
+
 export const execTinify = async (): Promise<{ success: boolean; msg: string }> => {
-  const { tinify, tinifyApiKey } = getRCTinify();
+  const { tinify, tinifyApiKey, tinifySkipUuids } = getRCTinify();
 
   if (!tinify) {
     return { success: false, msg: '未开启图片压缩' };
@@ -105,7 +112,24 @@ export const execTinify = async (): Promise<{ success: boolean; msg: string }> =
   }
 
   const originPkgPath = getOriginPkgPath();
-  const files = getAllFilesFormDir(originPkgPath).filter(checkImgType);
+  const allImgFiles = getAllFilesFormDir(originPkgPath).filter(checkImgType);
+
+  console.info(`[压缩] 扫描目录: ${originPkgPath}`);
+  console.info(`[压缩] 发现 ${allImgFiles.length} 个图片文件:`);
+  for (const f of allImgFiles) {
+    const baseName = path.basename(f, path.extname(f));
+    console.info(`[压缩]   文件名: ${baseName}  (${path.basename(f)})`);
+  }
+
+  const skippedFiles = allImgFiles.filter(f => isUuidSkipped(f, tinifySkipUuids));
+  const files = allImgFiles.filter(f => !isUuidSkipped(f, tinifySkipUuids));
+
+  if (skippedFiles.length > 0) {
+    console.info(`[压缩] 跳过 ${skippedFiles.length} 个 UUID 匹配的图片`);
+    for (const f of skippedFiles) {
+      console.info(`[压缩]   跳过: ${path.basename(f)}`);
+    }
+  }
 
   if (files.length === 0) {
     return { success: true, msg: '未发现需要压缩的图片' };

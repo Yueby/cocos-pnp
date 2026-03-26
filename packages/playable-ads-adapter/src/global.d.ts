@@ -465,6 +465,7 @@ type TAdapterRC = {
 	};
 	tinify?: boolean;
 	tinifyApiKey?: string;
+	tinifySkipUuids?: string[];
 	isZip?: boolean;
 	storePath?: string;
 };
