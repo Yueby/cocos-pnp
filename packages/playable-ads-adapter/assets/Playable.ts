@@ -26,6 +26,7 @@ interface PlayableType {
 	isChannel(channel: string): boolean;
 	showAds(onSuccess?: () => void, onError?: () => void): void;
 	tryGameEnd(): void;
+	tryGameRetry(): void;
 	start(): void;
 }
 
@@ -77,6 +78,20 @@ window.playable = {
 		}
 	},
 	
+	// 尝试调用游戏重玩（通知平台）
+	tryGameRetry(): void {
+		switch (this.channel) {
+			case Channels.Mintegral:
+				// @ts-ignore
+				window.gameRetry && window.gameRetry();
+				break;
+			// 其他平台按需添加
+			default:
+				// 静默处理
+				break;
+		}
+	},
+	
 	// 启动游戏（针对特定渠道）
 	start(): void {
 		switch (this.channel) {
@@ -94,6 +109,21 @@ window.playable = {
 	}
 };
 
-// 导出类型化的别名
+/**
+ * Playable 渠道工具类
+ *
+ * 快速导入：
+ * ```ts
+ * import { Playable, Channels } from 'db://playable-ads-adapter/Playable';
+ * ```
+ *
+ * 常用 API：
+ * - `Playable.channel` / `Playable.lang` — 当前渠道名与语言（构建时注入）
+ * - `Playable.isChannel(Channels.Mintegral)` — 渠道判断
+ * - `Playable.showAds(onSuccess?, onError?)` — 点击 CTA，触发渠道跳转
+ * - `Playable.tryGameEnd()` — 结束画面出现时调用（Mintegral / Bigo 必需）
+ * - `Playable.tryGameRetry()` — 重玩场景调用（Mintegral 必需）
+ * - `Playable.start()` — 针对特定渠道的启动钩子（如 Unity 可见性检查）
+ */
 // @ts-ignore
 export const Playable: PlayableType = window.playable;

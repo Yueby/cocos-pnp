@@ -25,7 +25,7 @@ export const CHANNEL_TIPS: Partial<Record<TChannel, TChannelTip>> = {
         level: 'warn'
     },
     Mintegral: {
-        message: '需要在结束页面出现时调用 <b>Playable.tryGameEnd()</b> 函数来通知平台游戏已结束',
+        message: '结束页面出现时需调用 <b>Playable.tryGameEnd()</b> 通知平台游戏已结束；若存在重玩场景，还需在重玩时调用 <b>Playable.tryGameRetry()</b>',
         link: 'https://www.playturbo.cn/review/doc',
         linkText: '查看详情',
         level: 'warn'
