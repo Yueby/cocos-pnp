@@ -1,6 +1,6 @@
 {
   "name": "playable-adapter-core",
-  "version": "1.2.22",
+  "version": "2.0.0",
   "description": "A node application for exporting playable ads",
   "title": "Playable Adapter Core",
   "main": "dist/playable-adapter-core.js",
@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/ppgee/cocos-pnp/tree/main/packages/playable-adapter-core#readme",
   "scripts": {
-    "clear": "rm -rf dist/",
+    "clear": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "watch": "rollup -c -w",
     "build": "rollup -c"
   },

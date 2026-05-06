@@ -20,16 +20,17 @@
 
 ## Cocos Version Support
 
-| >= 2.4.6 | >= 3.8.x |
-| -------- | -------- |
-| ✅       |    ✅    |
+This package is maintained only for Cocos Creator 3.8.x and later.
+
+| >= 3.8.x |
+| -------- |
+| ✅       |
 
 ## Platform Support
 
-|              | AppLovin | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | Tiktok | Unity |
-| ------------ | -------- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | ------ | ----- |
-| **>= 2.4.6** | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅     | ✅    |
-| **>= 3.8.x**    | ✅       | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅     | ✅    |
+|              | AppLovin | Bigo | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | SnapChat | Tiktok | Unity | Yandex |
+| ------------ | -------- | ---- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | -------- | ------ | ----- | ------ |
+| **>= 3.8.x** | ✅       | ✅   | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅       | ✅     | ✅    | ✅     |
 
 ## Installing
 
@@ -58,14 +59,14 @@ $ pnpm install playable-adapter-core
 ### common
 
 ```typescript
-import { TPlatform, exec2xAdapter } from "playable-adapter-core";
+import { TPlatform, execAdapter } from "playable-adapter-core";
 
 const main = async () => {
   const config = {
     buildFolderPath: "/your/build/folder/path",
-    adapterRC: {
+    adapterBuildConfig: {
       buildPlatform: "web-mobile",
-      exportChannels: "Facebook",
+      exportChannels: ["Facebook"],
       injectOptions: {
         Facebook: {},
       },
@@ -77,9 +78,7 @@ const main = async () => {
     },
   };
 
-  // required
-  const version = "2"; // '2' | '3'
-  version === "2" ? await exec2xAdapter(config) : await exec3xAdapter(config);
+  await execAdapter(config);
 };
 
 main();
@@ -94,7 +93,7 @@ npm install safeify
 ```typescript
 import { Api, useContext } from "@midwayjs/hooks";
 import { Context } from "@midwayjs/koa";
-import { TPlatform, exec2xAdapter, exec3xAdapter } from "playable-adapter-core";
+import { TPlatform, execAdapter } from "playable-adapter-core";
 import { Safeify } from "safeify";
 
 export const uploadBuildPkg = Api(Upload(), async () => {
@@ -121,8 +120,6 @@ export const uploadBuildPkg = Api(Upload(), async () => {
     [key in TChannel]: TChannelRC;
   };
   const webOrientation = fields.webOrientation ?? "auto";
-  const version = fields.version ?? "2";
-
   const zipFilePath = buildPkg.data;
   const zipExt = buildPkg._ext;
   const filename = buildPkg.filename.replaceAll(buildPkg._ext, "") as TPlatform;
@@ -152,14 +149,10 @@ export const uploadBuildPkg = Api(Upload(), async () => {
   });
   await safeVm.run(
     `
-      version === '2'
-        ? await exec2xAdapter(config)
-        : await exec3xAdapter(config)
+      await execAdapter(config)
     `,
     {
-      version,
-      exec2xAdapter,
-      exec3xAdapter,
+      execAdapter,
       config,
     }
   );
@@ -209,6 +202,7 @@ inject script in building html
 ```typescript
 type TChannel =
   | "AppLovin"
+  | "Bigo"
   | "Facebook"
   | "Google"
   | "IronSource"
@@ -217,8 +211,10 @@ type TChannel =
   | "Moloco"
   | "Pangle"
   | "Rubeex"
+  | "SnapChat"
   | "Tiktok"
-  | "Unity";
+  | "Unity"
+  | "Yandex";
 
 const injectOptions: {
   [key in TChannel]: {
@@ -254,7 +250,7 @@ let config = {
 
 `URL.createObjectURL` instead of `System.__proto__.createScript`
 
-Since Cocos Creator 3.7 has updated SystemJS, adjustments have been made in the implementation. Instead of modifying `System.__proto__.createScript`, the choice is to use `URL.createObjectURL` to maintain the default behavior of SystemJS. This change does not affect version 2.x.
+Since Cocos Creator 3.7 has updated SystemJS, adjustments have been made in the implementation. Instead of modifying `System.__proto__.createScript`, the choice is to use `URL.createObjectURL` to maintain the default behavior of SystemJS. This change applies to the current 3.x-focused line.
 
 The `URL.createObjectURL` method is used to create a URL that represents the given object (such as a `File` or `Blob` object) in the parameter. When you directly open an HTML file on the local file system (e.g., using a URL starting with `file:///`), modern browsers typically restrict many file system-related web APIs, including creating object URLs, for security reasons. It is strongly recommended to serve files through an HTTP server instead of trying to bypass the browser's security restrictions.
 

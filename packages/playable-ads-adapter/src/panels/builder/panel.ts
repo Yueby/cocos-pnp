@@ -4,7 +4,6 @@ import { shell } from 'electron';
 import { existsSync, promises } from 'fs';
 import https from 'https';
 
-import { buildState } from '../../extensions/builder/3x';
 import { ADAPTER_RC_PATH } from '../../extensions/constants';
 import { readAdapterRCFileForPanel } from '../../extensions/utils/file-system/adapterrc';
 import { logger } from '../utils/logger';
@@ -15,7 +14,9 @@ let panel: ICustomPanelThis;
 let unsubscribeBuildState: (() => void) | null = null;
 let _eventsInitialized = false;
 let _buildFinishedHandler: (() => void) | null = null;
+let _buildStateHandler: ((state: { building: boolean; error?: string }) => void) | null = null;
 let _updateLanguageHandler: ((lang: string) => void) | null = null;
+let isBuilding = false;
 
 export const style = STYLE;
 export const template = TEMPLATE;
@@ -25,7 +26,8 @@ export const $ = SELECTORS;
  * 初始化构建状态监听器
  */
 function initBuildStateListener() {
-	unsubscribeBuildState = buildState.subscribe(({ building, error }) => {
+	_buildStateHandler = ({ building, error }) => {
+		isBuilding = building;
 		const mask = panel.$[IDS.BUILDING_MASK];
 		if (!mask) {
 			logger.error('找不到构建遮罩层元素');
@@ -41,7 +43,14 @@ function initBuildStateListener() {
 				logger.error('构建失败:', error);
 			}
 		}
-	});
+	};
+	Editor.Message.addBroadcastListener('adapter:build-state', _buildStateHandler);
+	unsubscribeBuildState = () => {
+		if (_buildStateHandler) {
+			Editor.Message.removeBroadcastListener('adapter:build-state', _buildStateHandler);
+			_buildStateHandler = null;
+		}
+	};
 }
 
 /**
@@ -1274,7 +1283,7 @@ function initCreatePanelButtons() {
 }
 
 function handleBuild() {
-	if (buildState.building) {
+	if (isBuilding) {
 		return;
 	}
 	Editor.Message.send(PACKAGE_NAME, 'adapter-build');

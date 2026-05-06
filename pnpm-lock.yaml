@@ -105,9 +105,6 @@ importers:
       mime-types:
         specifier: ^2.1.35
         version: 2.1.35
-      node-cmd:
-        specifier: ^5.0.0
-        version: 5.0.0
       playable-adapter-core:
         specifier: workspace:*
         version: link:../playable-adapter-core
@@ -157,8 +154,6 @@ importers:
       uglify-js:
         specifier: ^3.17.4
         version: 3.17.4
-
-  packages/playable-ads-adapter/dist/playable-ads-adapter: {}
 
 packages:
 
@@ -1171,10 +1166,6 @@ packages:
 
   mute-stream@0.0.8:
     resolution: {integrity: sha512-nnbWWOkoWyUsTjKrhgD0dcz22mdkSnpYqbEjIm2nhwhuxlSkpywJmBo8h0ZqJdkp73mb90SssHkN4rsRaBAfAA==}
-
-  node-cmd@5.0.0:
-    resolution: {integrity: sha512-4sQTJmsS5uZKAPz/Df9fnIbmvOySfGdW+UreH4X5NcAOOpKjaE+K5wf4ehNBbZVPo0vQ36RkRnhhsXXJAT+Syw==}
-    engines: {node: '>=6.4.0'}
 
   normalize-package-data@2.5.0:
     resolution: {integrity: sha512-/5CMN3T0R4XTj4DcGaexo+roZSdSFW/0AOOTROrjxzCG1wrWXEsGbRKevjlIL+ZDE4sZlJr5ED4YW0yqmkK+eA==}
@@ -2745,8 +2736,6 @@ snapshots:
   mute-stream@0.0.7: {}
 
   mute-stream@0.0.8: {}
-
-  node-cmd@5.0.0: {}
 
   normalize-package-data@2.5.0:
     dependencies:

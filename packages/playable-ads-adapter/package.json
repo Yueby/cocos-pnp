@@ -1,5 +1,5 @@
 {
-  "version": "1.3.36",
+  "version": "2.0.0",
   "name": "playable-ads-adapter",
   "description": "i18n:playable-ads-adapter.description",
   "main": "./main.js",
@@ -22,14 +22,10 @@
   },
   "author": "ppgee & yueby",
   "scripts": {
-    "clear": "rm -rf dist/",
-    "watch": "rollup -c -w",
-    "build": "rollup -c",
-    "build:2x": "pnpm clear && pnpm build --environment BUILD_VERSION:2x",
-    "watch:2x": "pnpm clear && pnpm watch --environment BUILD_VERSION:2x",
-    "build:3x": "pnpm clear && pnpm build --environment BUILD_VERSION:3x",
-    "watch:3x": "pnpm clear && pnpm watch --environment BUILD_VERSION:3x",
-    "package": "sh ./scripts/package.sh"
+    "clear": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "watch": "pnpm -F playable-adapter-core build && pnpm clear && rollup -c -w",
+    "build": "pnpm -F playable-adapter-core build && pnpm clear && rollup -c",
+    "package": "node ../../scripts/package-playable.js"
   },
   "dependencies": {
     "axios": "^1.1.3",
@@ -37,7 +33,6 @@
     "fs-extra": "^11.3.0",
     "jszip": "^3.10.1",
     "mime-types": "^2.1.35",
-    "node-cmd": "^5.0.0",
     "playable-adapter-core": "workspace:*"
   }
 }

@@ -1,7 +1,7 @@
-import { builder3x } from '@/extensions/builder/3x';
+import { builder } from '@/extensions/builder';
 
 export const methods: { [key: string]: (...any: any) => any; } = {
-	builder3x,
+	builder,
 	updateLanguage: async (lang: string) => {
 		Editor.Message.broadcast('update-panel-language', lang);
 	}

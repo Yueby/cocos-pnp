@@ -1,18 +1,35 @@
-import { run } from 'node-cmd'
+import { promises as fs } from 'fs';
+import { dirname } from 'path';
+
+function normalizeWindowsDrivePath(filepath) {
+  if (process.platform !== 'win32') {
+    return filepath;
+  }
+
+  const match = filepath.match(/^\/([a-zA-Z])\/(.*)$/);
+  if (!match) {
+    return filepath;
+  }
+
+  return `${match[1].toUpperCase()}:/${match[2]}`;
+}
 
 export default function cocosPluginUpdater(options) {
-  const { src, dest } = options
+  const { src, dest } = options;
   return {
     name: 'cocos-plugin-update',
-    closeBundle() {
-      // console.log(process.env)
+    async closeBundle() {
       if (!src || !dest) {
-        return
+        return;
       }
 
-      console.log('cocos-plugin-update copy folder to global cocos plugin packages')
-      run(`rm -rf ${dest} && cp -r ${src} ${dest}`)
-      console.log('cocos-plugin-update copy folder success')
+      const normalizedDest = normalizeWindowsDrivePath(dest);
+
+      console.log(`cocos-plugin-update copy folder to ${normalizedDest}`);
+      await fs.mkdir(dirname(normalizedDest), { recursive: true });
+      await fs.rm(normalizedDest, { recursive: true, force: true });
+      await fs.cp(src, normalizedDest, { recursive: true });
+      console.log('cocos-plugin-update copy folder success');
     }
-  }
+  };
 }

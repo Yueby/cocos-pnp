@@ -6,6 +6,5 @@ export {
 } from './typings'
 
 export {
-  exec2xAdapter,
-  exec3xAdapter,
+  execAdapter,
 } from './executor'

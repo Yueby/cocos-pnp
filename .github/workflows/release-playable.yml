@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - playable-ads-adapter-[0-9]+.*
+      - playable-ads-adapter-*
 
 jobs:
   build-and-release:
@@ -20,13 +20,13 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
 
       - uses: pnpm/action-setup@v2
         name: Install pnpm
         id: pnpm-install
         with:
-          version: 7
+          version: 10
           run_install: false
 
       - name: Get pnpm store directory
@@ -44,16 +44,13 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build plugins
-        run: |
-          chmod +x ./scripts/package-playable.sh
-          ./scripts/package-playable.sh
-        shell: bash
+        run: pnpm run package
 
       - name: Release plugins
-        uses: marvinpinto/action-automatic-releases@latest
+        uses: marvinpinto/action-automatic-releases@v1.2.1
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           automatic_release_tag: ${{ env.RELEASE_VERSION }}

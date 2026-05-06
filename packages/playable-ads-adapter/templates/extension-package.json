@@ -3,7 +3,7 @@
   "name": "playable-ads-adapter",
   "description": "i18n:playable-ads-adapter.description",
   "main": "./main.js",
-  "editor": ">=3.3.0",
+  "editor": ">=3.8.0",
   "author": "ppgee & yueby",
   "contributions": {
     "asset-db": {
@@ -23,7 +23,7 @@
     "messages": {
       "adapter-build": {
         "methods": [
-          "builder3x"
+          "builder"
         ]
       },
       "update-language": {

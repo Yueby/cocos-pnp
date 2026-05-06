@@ -1,16 +1,15 @@
 import { genSingleFile as baseGenSingleFile } from './base';
 import {
-  get3xSingleFilePath,
+  getSingleFilePath,
 } from "@/utils";
 import {
-  injects3xCode,
+  injectsCode,
 } from '@/helpers/injects';
-import { TAdapterRC } from "@/typings";
 
 export const genSingleFile = async () => {
   const resp = await baseGenSingleFile({
-    injectsCode: injects3xCode,
-    singleFilePath: get3xSingleFilePath()
+    injectsCode: injectsCode,
+    singleFilePath: getSingleFilePath()
   });
 
   return resp;

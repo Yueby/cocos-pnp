@@ -1,252 +1,251 @@
-# Playable ads adapter
+# Cocos Playable Ads Adapter
 
-A Plugin for Exporting Cocos Playable Ads in Multi-Channel.
+中文说明见 [README-CN.md](./README-CN.md).
 
-中文说明，点击[这里](./README-CN.md)
+This repository contains a pnpm monorepo for exporting Cocos Creator playable ads to multiple ad network formats.
 
-**⚠️ Important: This fork only supports Cocos Creator 3.x. Version 2.x is untested and not guaranteed to work.**
+> This fork is maintained only for **Cocos Creator 3.8.x and later**. Cocos Creator 2.x support has been removed.
 
-**New Features in This Fork:**
-- Added support for Bigo, SnapChat, and Yandex channels
-- Optimized MRAID SDK integration and platform lifecycle management
-- **Provided `Playable` utility class for platform API calls (New in This Fork)**
-- Enhanced UI in build panel
+## Packages
 
-### New Playable Utility Class
-
-This fork introduces a global `Playable` object to simplify channel detection and API calls:
-
-```typescript
-import { Playable, Channels } from 'db://playable-ads-adapter/Playable';
-
-// Check current channel
-if (Playable.isChannel(Channels.Unity)) {
-  console.log('Current channel is Unity');
-}
-
-// Get current channel name and language
-console.log(Playable.channel); // e.g., 'Unity', 'Mintegral', 'Bigo'
-console.log(Playable.lang);     // Language code
-
-// Check if SDK is ready (MRAID platforms)
-console.log(Playable.sdkReady);
-
-// Show ads
-Playable.showAds(
-  () => console.log('Ad shown successfully'), 
-  () => console.log('Ad failed to show')
-);
-
-// Notify game end (Required for Mintegral and Bigo)
-Playable.tryGameEnd();
-
-// Try to pause game (Unity platform handles automatically)
-Playable.tryPause();
+```text
+packages/
+├── playable-adapter-core   # Core adapter engine
+└── playable-ads-adapter    # Cocos Creator editor extension
 ```
 
----
+### `playable-adapter-core`
 
-If you only need to use the plugin, you can download [the build package](https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true) directly. For other versions, please test them yourself. If you have any questions, feel free to submit an issue or pull request.
+Core build-output processor. It reads Cocos web build output, merges it into a single HTML file, inlines resources/scripts/styles, applies compression, and exports channel-specific packages.
 
-## Download
+Canonical API:
 
-Plugin download link:
+```ts
+import { execAdapter } from 'playable-adapter-core';
+
+await execAdapter({
+  buildFolderPath: '/path/to/build/web-mobile',
+  adapterBuildConfig: {
+    buildPlatform: 'web-mobile',
+    orientation: 'auto',
+    exportChannels: ['Google', 'Facebook'],
+  },
+});
+```
+
+### `playable-ads-adapter`
+
+Cocos Creator 3.8.x+ editor extension. It provides the builder panel, build hooks, worker execution, `.adapterrc` reading/writing, logging, and calls `playable-adapter-core` to generate playable ad packages.
+
+## Supported Channels
+
+| Channel | Supported |
+| --- | --- |
+| AppLovin | ✅ |
+| Bigo | ✅ |
+| Facebook | ✅ |
+| Google | ✅ |
+| IronSource | ✅ |
+| Liftoff | ✅ |
+| Mintegral | ✅ |
+| Moloco | ✅ |
+| Pangle | ✅ |
+| Rubeex | ✅ |
+| SnapChat | ✅ |
+| Tiktok | ✅ |
+| Unity | ✅ |
+| Yandex | ✅ |
+
+## Main Features
+
+- Cocos Creator 3.8.x+ build panel integration.
+- Automatic adaptation after Cocos build hooks.
+- Manual build from the extension menu/panel.
+- Optional `skipBuild` mode to adapt an existing Cocos build output.
+- Single-file HTML generation.
+- Channel-specific zip or directory zip exports.
+- Custom exported file name and HTML title.
+- Custom iOS / Android URLs with `<ios>` / `<android>` replacement in injected scripts.
+- Dynamic channel placeholder replacement with `{{__adv_channels_adapter__}}`.
+- Optional Tinypng image compression.
+- Optional Pako resource compression.
+- Runtime `Playable` utility class for channel checks and common ad lifecycle calls.
+
+## Install the Extension
+
+Download the packaged extension from releases:
 
 [https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true](https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true)
 
-## Install
+Then extract it into your Cocos Creator project extension directory:
 
-After downloading the plugin, extract it and place it in the Cocos Creator 3.x plugin folder:
-
-- **For 3.x, the plugin folder is `extensions` in the root directory of the project.**
-
-Once installed, you can use it. If you cannot find the plugin, try restarting the project.
-
-**Note: This fork only supports Cocos Creator 3.x. For 2.x support, please use the [original repository](https://github.com/ppgee/cocos-pnp).**
-
-## Using the Plugin
-
-- There are two ways to adapt the plugin. The first is to automatically trigger the adaptation function when building and publishing the project (select `web-mobile` or `web-desktop` as the build channel).
-
-- In the project option bar, select **多渠道构建**, then click **开始构建** to start the build.
-
-## Plugin Description
-
-### Supported Channels
-
-|              | AppLovin | Bigo | Facebook | Google | IronSource | Liftoff | Mintegral | Moloco | Pangle | Rubeex | SnapChat | Tiktok | Unity | Yandex |
-| ------------ | -------- | ---- | -------- | ------ | ---------- | ------- | --------- | ------ | ------ | ------ | -------- | ------ | ----- | ------ |
-| **>= 2.4.6** | ⚠️       | ⚠️   | ⚠️       | ⚠️     | ⚠️         | ⚠️      | ⚠️        | ⚠️     | ⚠️     | ⚠️     | ⚠️       | ⚠️     | ⚠️    | ⚠️     |
-| **3.x**      | ✅       | ✅   | ✅       | ✅     | ✅         | ✅      | ✅        | ✅     | ✅     | ✅     | ✅       | ✅     | ✅    | ✅     |
-
-**Note:**
-- ✅ = Tested and supported
-- ⚠️ = Untested, not guaranteed to work (this fork focuses on 3.x only)
-
-### Extend Features
-
-1. Supports global dynamic replacement of channel names, making it easy to handle special logic for a specific channel. The placeholder for this feature is `'{{__adv_channels_adapter__}}'`, for example:
-
-```typescript
-// source code
-window.advChannels = '{{__adv_channels_adapter__}}' // Prevent rollup dead code elimination from omitting this code, the placeholder variable can be mounted on the global without deactivation
-
-// Code will be replaced with Facebook channel:
-window.advChannels = 'Facebook'
+```text
+<your-cocos-project>/extensions/playable-ads-adapter
 ```
 
-2. Supports injecting additional scripts for each channel to configure special business logic. You need to create a `.adapterrc` file in the root directory to edit the configuration information in JSON format. An example of the configuration is as follows:
+Restart the Cocos Creator project if the extension does not appear immediately.
 
-```typescript
-type TChannel =
-  | 'AppLovin'
-  | 'Bigo'
-  | 'Facebook'
-  | 'Google'
-  | 'IronSource'
-  | 'Liftoff'
-  | 'Mintegral'
-  | 'Moloco'
-  | 'Pangle'
-  | 'Rubeex'
-  | 'Tiktok'
-  | 'Unity'
-  | 'SnapChat'
-  | 'Yandex'
+## Using the Extension
 
-type TPlatform =
-  | 'web-desktop'
-  | 'web-mobile';
+The extension can run in two ways:
 
-type TWebOrientations = 'portrait' | 'landscape' | 'auto'
+1. **Cocos build hook**: build a `web-mobile` or `web-desktop` target from Cocos Creator; the adapter runs after build.
+2. **Extension panel**: open the **多渠道构建** menu and click **开始构建**.
 
-type TAdapterRC = {
-  buildPlatform?: TPlatform // Cocos build platform value
-  orientation?: TWebOrientations // Cocos build device orientation value
-  exportChannels?: TChannel[] // Channels to export. If empty or not specified, export all channels.
-  skipBuild?: boolean // Whether to skip the build process. Default is false.
-  enableSplash?: boolean // Whether to set a custom splash screen. Default is true.
-  injectOptions?: {
-    [key in TChannel]: {
-      head: string // Appended to the head tag in HTML
-      body: string // Appended before all scripts in the body tag in HTML
-      sdkScript: string // Injects the SDK script into the corresponding channel
-    }
-  },
-  isZip?: boolean // // Whether to compress the package with Pako, the default is true
-  tinify?: boolean // Whether to compress images with Tinypng.
-  tinifyApiKey?: string // Tinypng API key
-}
-```
+The panel reads and writes `.adapterrc.json` in the Cocos project root. Legacy `.adapterrc` is still read for compatibility.
 
-`.adapterrc` file example:
+## `.adapterrc.json` Example
 
 ```json
 {
+  "fileName": "playable",
+  "title": "Playable Ad",
+  "lang": "en",
+  "iosUrl": "https://example.com/ios",
+  "androidUrl": "https://example.com/android",
   "buildPlatform": "web-mobile",
   "orientation": "auto",
+  "skipBuild": false,
+  "exportChannels": ["Google", "Facebook"],
+  "enableSplash": true,
+  "isZip": true,
+  "tinify": false,
+  "tinifyApiKey": "",
+  "tinifySkipUuids": [],
   "injectOptions": {
-    "AppLovin": {
-      "head": "<script>console.log('AppLovin')</script>"
-    },
-    "Google": {
-      "body": "<a onclick=\"ExitApi.exit()\" style=\"display: none;\"></a>"
-    },
     "Unity": {
-      "body": "<script>if(mraid.getState()==='loading'){mraid.addEventListener('ready',onSdkReady)}else{onSdkReady()}function viewableChangeHandler(viewable){if(viewable){}else{}}function onSdkReady(){mraid.addEventListener('viewableChange',viewableChangeHandler);if(mraid.isViewable()){showMyAd()}}var url='ios链接';var android='安卓链接';if(/android/i.test(userAgent)){url=android}function showMyAd(){mraid.open(url)}</script>",
+      "body": "<script>var iosUrl='<ios>';var androidUrl='<android>';</script>",
       "sdkScript": "<script src=\"./mraid.js\"></script>"
     }
   }
 }
 ```
 
-3. Supports specifying selected channels, using the following configuration:
+Important fields:
 
-```json
-// .adapterrc
-{
-  "exportChannels": ["Google", "Facebook"] // Channels to export. If empty or not specified, export all channels.
+| Field | Description |
+| --- | --- |
+| `fileName` | Custom output file name. |
+| `title` | Custom HTML title. |
+| `lang` | Language value exposed to runtime code. |
+| `iosUrl` / `androidUrl` | Store URLs and replacement values for `<ios>` / `<android>`. |
+| `buildPlatform` | Cocos build platform, usually `web-mobile` or `web-desktop`. |
+| `orientation` | `auto`, `portrait`, or `landscape`. |
+| `skipBuild` | Skip Cocos build and adapt an existing build folder. |
+| `exportChannels` | Channels to export. Empty or omitted means all channels. |
+| `enableSplash` | Whether to process the splash screen. |
+| `isZip` | Whether to use Pako resource compression. |
+| `tinify` / `tinifyApiKey` / `tinifySkipUuids` | Tinypng compression options. |
+| `injectOptions` | Channel-specific script injection for `head`, `body`, and `sdkScript`. |
+
+## Runtime `Playable` Utility
+
+The extension provides `assets/Playable.ts` for runtime channel checks and common platform calls:
+
+```ts
+import { Playable, Channels } from 'db://playable-ads-adapter/Playable';
+
+if (Playable.isChannel(Channels.Unity)) {
+  console.log('Current channel is Unity');
 }
+
+console.log(Playable.channel);
+console.log(Playable.lang);
+console.log(Playable.sdkReady);
+
+Playable.showAds(
+  () => console.log('Ad shown'),
+  () => console.log('Ad failed'),
+);
+
+Playable.tryGameEnd();
+Playable.tryGameRetry();
+Playable.tryPause();
 ```
 
-4. Supports image compression with `Tinypng` to further reduce the package size, using the following configuration:
+For channel-specific code that should survive bundling/tree-shaking, keep the dynamic channel placeholder reachable at runtime:
 
-```json
-// .adapterrc
-{
-  ...,
-  "tinify": true // Whether to compress images with Tinypng
-  "tinifyApiKey": "YOUR_TINYPNG_API_KEY" // Tinypng API key
-}
+```ts
+window.advChannels = '{{__adv_channels_adapter__}}';
 ```
 
-5. Supports Pako compression to further reduce the package size, using the following configuration:
+During export it is replaced with the target channel name, for example:
 
-```json
-// .adapterrc
-{
-  ...,
-  "isZip": true // Whether to compress the package with Pako, the default is true
-}
+```ts
+window.advChannels = 'Facebook';
 ```
 
-## Plugin Development and Build Steps
+## Development
 
-### Clone the Project
+Install dependencies:
 
 ```bash
-git clone git@github.com:ppgee/cocos-pnp.git
-```
-
-### Development Setup and Dependency Installation
-
-Please configure the hot update plugin directory first.
-
-```javascript
-// rollup.config.js
-...
-const plugins = [
-  ...,
-  /*
-   * src is the exported project in the current project
-   * desc is the global directory of the developer's Cocos editor
-   */
-  cocosPluginUpdater({
-    src: `${__dirname}/${outputDir}`,
-    dest: `~/.CocosCreator/${is2xBuilder ? 'packages' : 'extensions'}/${appName}`
-  }),
-]
-...
-
-```
-
-```bash
-# Install dependencies
 pnpm install
-
-# Develop version 2.4.x
-pnpm watch:2x
-
-# Develop version 3.x
-pnpm watch:3x
 ```
 
-### Build the Project
+### Local Cocos Extension Destination
+
+`pnpm build` and `pnpm watch` can optionally copy the built extension into your local Cocos Creator extensions directory.
+
+Create a local `.env` from `.env.example`:
+
+```env
+COCOS_EXTENSION_DEST=
+```
+
+Set `COCOS_EXTENSION_DEST` to the parent `extensions` directory:
+
+```env
+COCOS_EXTENSION_DEST=/path/to/CocosCreator/extensions
+```
+
+The extension is copied to:
+
+```text
+${COCOS_EXTENSION_DEST}/playable-ads-adapter
+```
+
+If `COCOS_EXTENSION_DEST` is empty or missing, the build only writes to:
+
+```text
+packages/playable-ads-adapter/dist/playable-ads-adapter
+```
+
+`.env` is ignored by git. Commit `.env.example`, not `.env`.
+
+### Scripts
 
 ```bash
-# Install dependencies
-pnpm install
+# Build core only
+pnpm run build:core
 
-# Build version 2.4.x
-pnpm build:2x
+# Build the extension. The adapter package builds core first.
+pnpm run build
 
-# Build version 3.x
-pnpm build:3x
+# Watch extension build. Also uses COCOS_EXTENSION_DEST when set.
+pnpm run watch
+
+# Build and create packages/playable-ads-adapter/dist/playable-ads-adapter.zip
+pnpm run package
 ```
 
-### [Contributors](https://github.com/ppgee/cocos-pnp/graphs/contributors)
+## Release
 
-<a href="https://github.com/ppgee/cocos-pnp/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=ppgee/cocos-pnp" />
-</a>
+The GitHub workflow releases zip artifacts for tags matching:
 
+```text
+playable-ads-adapter-*
+```
+
+It runs:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run package
+```
+
+## Notes
+
+- `package_version: 2` in the Cocos extension manifest is the Cocos extension schema version, not Creator 2.x support.
+- `.adapterrc` compatibility is retained for existing projects, but `.adapterrc.json` is the preferred config file.
+- `settings.js` fallback is retained for Cocos build-output compatibility.

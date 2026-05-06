@@ -1,6 +1,7 @@
+import { PACKAGE_NAME } from '@/extensions/logger';
 import { IBuildTaskOption, IPanelThis } from "../../../../@types";
 
-export const PACKAGE_NAME = 'playable-ads-adapter';
+export { PACKAGE_NAME };
 export type TAdapterRCKeys = keyof TAdapterRC;
 
 // 排除 exportChannels 和 injectOptions 的类型

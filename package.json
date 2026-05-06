@@ -7,11 +7,9 @@
     "commit": "cz",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:core": "pnpm -F playable-adapter-core build",
-    "build:2x": "pnpm run build:core && pnpm -F playable-ads-adapter build:2x",
-    "build:3x": "pnpm run build:core && pnpm -F playable-ads-adapter build:3x",
-    "build": "pnpm run build:core && pnpm -F playable-ads-adapter build:2x && pnpm -F playable-ads-adapter build:3x",
-    "watch:2x": "pnpm -F playable-ads-adapter watch:2x",
-    "watch:3x": "pnpm -F playable-ads-adapter watch:3x"
+    "build": "pnpm -F playable-ads-adapter build",
+    "watch": "pnpm -F playable-ads-adapter watch",
+    "package": "node scripts/package-playable.js"
   },
   "repository": {
     "type": "git",

@@ -4,26 +4,57 @@ import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
+import { existsSync, readFileSync } from 'fs';
 import isBuiltin from 'is-builtin-module';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import copy from 'rollup-plugin-copy';
 import pkgJson from './package.json';
 import cocosPluginUpdater from './plugins/cocos-plugin-updater';
 import cocosPluginWorker from './plugins/cocos-plugin-worker';
 
+function loadEnvFile(filePath) {
+  if (!existsSync(filePath)) {
+    return;
+  }
+
+  const contents = readFileSync(filePath, 'utf-8');
+
+  for (const line of contents.split(/\r?\n/)) {
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf('=');
+
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim().replace(/^['"]|['"]$/g, '');
+
+    if (key && process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadEnvFile(resolve(__dirname, '../../.env'));
+loadEnvFile(resolve(__dirname, '.env'));
+
 const appName = pkgJson.name;
 const appVersion = pkgJson.version;
 const outputDir = `dist/${appName}`;
-const builderVersion = process.env.BUILD_VERSION || '2x';
-const is2xBuilder = builderVersion === '2x';
+const cocosExtensionDest = process.env.COCOS_EXTENSION_DEST;
+const cocosPluginDest = cocosExtensionDest ? `${cocosExtensionDest}/${appName}` : undefined;
 
 export default {
   input: {
-    main: `src/main${builderVersion}.ts`,
-    ...(is2xBuilder ? {} : {
-      hooks: `src/hooks.ts`,
-      panel: `src/panels/${builderVersion}/panel.ts`
-    })
+    main: 'src/main.ts',
+    hooks: 'src/hooks.ts',
+    panel: 'src/panels/builder/panel.ts'
   },
   output: {
     dir: outputDir,
@@ -41,16 +72,14 @@ export default {
     }),
     json(),
     nodeResolve({
-      preferBuiltins: is2xBuilder,
-      ...(is2xBuilder ? {} : {
-        resolveOnly: (module) => module === 'string_decoder' || !isBuiltin(module),
-        exportConditions: ['node'],
-      })
+      preferBuiltins: false,
+      resolveOnly: (module) => module === 'string_decoder' || !isBuiltin(module),
+      exportConditions: ['node'],
     }),
     copy({
       targets: [
         {
-          src: `templates/package-${builderVersion}.json`,
+          src: 'templates/extension-package.json',
           dest: outputDir,
           rename: 'package.json',
           transform: (contents) => {
@@ -65,10 +94,12 @@ export default {
       verbose: true
     }),
     cocosPluginWorker(),
-    cocosPluginUpdater({
-      src: `${__dirname}/${outputDir}`,
-      dest: `/d/Develop/CocosCreator/${is2xBuilder ? 'packages' : 'extensions'}/${appName}`
-    }),
+    ...(cocosPluginDest
+      ? [cocosPluginUpdater({
+          src: `${__dirname}/${outputDir}`,
+          dest: cocosPluginDest
+        })]
+      : []),
   ],
-  external: ['fs', 'path', 'os', 'electron']
+  external: ['fs', 'path', 'os', 'electron', 'child_process']
 };

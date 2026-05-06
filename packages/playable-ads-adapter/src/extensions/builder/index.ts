@@ -1,11 +1,30 @@
 import { BUILDER_NAME } from '@/extensions/constants';
+import { logger, parseAdapterLogLevel, TLogPayload } from '@/extensions/logger';
 import { checkOSPlatform, getAdapterConfig, getRCSkipBuild, getRealPath } from '@/extensions/utils';
+import { spawn } from 'child_process';
 import { shell } from 'electron';
-import { run } from 'node-cmd';
 import { join } from 'path';
-import { exec3xAdapter } from 'playable-adapter-core';
+import { execAdapter } from 'playable-adapter-core';
 import { IBuildTaskOption } from '~types/packages/builder/@types';
-import workPath from '../worker/3x?worker';
+import workPath from '../worker?worker';
+
+type TBuildStatePayload = { building: boolean; error?: string };
+
+const serializeError = (error: unknown) => {
+	if (error instanceof Error) {
+		return error.message;
+	}
+	return error ? String(error) : undefined;
+};
+
+const notifyBuildState = (building: boolean, error?: unknown) => {
+	buildState.notify(building, error instanceof Error ? error : error ? new Error(String(error)) : undefined);
+	const payload: TBuildStatePayload = {
+		building,
+		error: serializeError(error)
+	};
+	Editor.Message.broadcast('adapter:build-state', payload);
+};
 
 const setupWorker = (params: { buildFolderPath: string; adapterBuildConfig: TAdapterRC }, successCb: Function, failCb: Function) => {
 	const { Worker } = require('worker_threads');
@@ -13,13 +32,34 @@ const setupWorker = (params: { buildFolderPath: string; adapterBuildConfig: TAda
 	const worker = new Worker(workPath, {
 		workerData: params
 	});
+	let settled = false;
+	const finish = (cb: Function, value?: unknown) => {
+		if (settled) return;
+		settled = true;
+		cb(value);
+	};
 	worker.on('message', ({ finished, msg, event }: TWorkerMsg) => {
 		if (event === 'adapter:finished') {
-			finished ? successCb() : failCb(msg);
+			finished ? finish(successCb) : finish(failCb, msg);
 			return;
 		}
-		// 处理消息 adapter:log 和 adapter:info
-		console[event.split(':')[1] as ConsoleMethodName](msg);
+
+		const level = parseAdapterLogLevel(event);
+		if (!level) {
+			logger.warn('收到未知 Worker 消息:', event, msg);
+			return;
+		}
+
+		const payload = msg as TLogPayload | string;
+		logger[level](typeof payload === 'string' ? payload : payload.message);
+	});
+	worker.on('error', (error: Error) => {
+		finish(failCb, error);
+	});
+	worker.on('exit', (code: number) => {
+		if (!settled) {
+			finish(failCb, new Error(`Worker退出但未完成适配，退出码 ${code}`));
+		}
 	});
 };
 
@@ -33,15 +73,27 @@ const runBuilder = (buildPlatform: TPlatform) => {
 			cocosBuilderPath = getRealPath(cocosBuilderPath).replace('/resources/app.asar', '/CocosCreator.exe');
 		} else {
 			reject(`不支持${platform}平台构建`);
+			return;
 		}
 
-		const processRef = run(`${cocosBuilderPath} --project ${Editor.Project.path} --build "platform=${buildPlatform}"`, (err, data, stderr) => {
-			console.log(err, data, stderr);
-			resolve();
+		const processRef = spawn(cocosBuilderPath, ['--project', Editor.Project.path, '--build', `platform=${buildPlatform}`], {
+			shell: false,
+			windowsHide: true
 		});
-		//listen to the python terminal output
-		processRef.stdout.on('data', (data: string) => {
-			console.log(data);
+
+		processRef.stdout?.on('data', (data: Buffer) => {
+			console.log(data.toString());
+		});
+		processRef.stderr?.on('data', (data: Buffer) => {
+			console.error(data.toString());
+		});
+		processRef.on('error', reject);
+		processRef.on('close', (code) => {
+			if (code === 0) {
+				resolve();
+				return;
+			}
+			reject(new Error(`Cocos Creator 构建失败，退出码 ${code}`));
 		});
 	});
 };
@@ -52,29 +104,34 @@ export const initBuildStartEvent = async (options: Partial<IBuildTaskOption>) =>
 };
 
 export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
-	return new Promise(async (resolve, reject) => {
+	return new Promise((resolve, reject) => {
 		const { projectRootPath, projectBuildPath, adapterBuildConfig } = getAdapterConfig();
 
 		// console.log(adapterBuildConfig?.fileName);
 		if(options.platform !== adapterBuildConfig?.buildPlatform){
 			console.warn('构建平台不匹配，跳过适配');
+			notifyBuildState(false);
+			resolve(false);
 			return;
 		}
 
 		const buildFolderPath = join(projectRootPath, projectBuildPath);
 
 		console.info(`${BUILDER_NAME} 开始适配，导出平台 ${options.platform}`);
+		notifyBuildState(true);
 
 		const start = new Date().getTime();
 
 		const handleExportFinished = () => {
 			const end = new Date().getTime();
 			console.log(`${BUILDER_NAME} 适配完成，共耗时${((end - start) / 1000).toFixed(0)}秒`);
+			notifyBuildState(false);
 			Editor.Message.broadcast('adapter:build-finished');
 			resolve(true);
 		};
-		const handleExportError = (err: string) => {
+		const handleExportError = (err: unknown) => {
 			console.error('适配失败');
+			notifyBuildState(false, err);
 			reject(err);
 		};
 
@@ -92,10 +149,9 @@ export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
 		} catch (error) {
 			console.log('不支持Worker，将开启主线程适配');
 
-			await exec3xAdapter(params, {
+			execAdapter(params, {
 				mode: 'serial'
-			});
-			handleExportFinished();
+			}).then(handleExportFinished).catch(handleExportError);
 		}
 	});
 };
@@ -113,12 +169,12 @@ export const buildState = {
 	}
 };
 
-export const builder3x = async () => {
+export const builder = async () => {
 	try {
 		const { buildPlatform, projectRootPath, projectBuildPath } = getAdapterConfig();
 		console.info('开始构建项目');
 		console.info(`【构建平台】${buildPlatform}`);
-		buildState.notify(true);
+		notifyBuildState(true);
 
 		const isSkipBuild = getRCSkipBuild();
 		const buildPath = join(projectRootPath, projectBuildPath);
@@ -136,8 +192,7 @@ export const builder3x = async () => {
 		console.info('构建完成');
 	} catch (error) {
 		console.error('构建失败:', error);
-		buildState.notify(false, error as Error);
+		notifyBuildState(false, error);
 		return;
 	}
-	buildState.notify(false);
 };

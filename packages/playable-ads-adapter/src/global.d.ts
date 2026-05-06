@@ -477,10 +477,10 @@ type TResZipInfo = {
 	ratio: number;
 };
 
-type ConsoleMethodName = 'log' | 'info' | 'warn' | 'error'; // 等等，根据需要添加
+type ConsoleMethodName = 'debug' | 'log' | 'info' | 'warn' | 'error';
 type PrefixedConsoleMethodName = `adapter:${ConsoleMethodName}`;
 type TWorkerMsg = {
 	event: 'adapter:finished' | PrefixedConsoleMethodName;
 	finished: boolean;
-	msg: string;
+	msg: unknown;
 };

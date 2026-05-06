@@ -39,10 +39,8 @@ export default [
       replace({
         preventAssignment: true,
         values: {
-          __adapter_init_2x_code__: () => getJSCode('/injects/2x/init.js'),
-          __adapter_main_2x_code__: () => getJSCode('/injects/2x/main.js'),
-          __adapter_init_3x_code__: () => getJSCode('/injects/3x/init.js'),
-          __adapter_main_3x_code__: () => getJSCode('/injects/3x/main.js'),
+          __adapter_init_code__: () => getJSCode('/injects/runtime/init.js'),
+          __adapter_main_code__: () => getJSCode('/injects/runtime/main.js'),
           __adapter_jszip_code__: () => getJSCode('/injects/libs/pako.js'),
         }
       }),
