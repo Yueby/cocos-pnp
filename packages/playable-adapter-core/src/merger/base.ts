@@ -165,7 +165,7 @@ const paddingAllResToMapped = async (options: { injectsCode: TOptions['injectsCo
 	let compDiff = 0;
 
 	if (isZip) {
-		console.info('[压缩] 开始压缩资源包...');
+		console.log('[压缩] 开始压缩资源包...');
 		const zip = deflate(resStr);
 		const zipStr = Buffer.from(zip).toString('base64');
 
@@ -173,11 +173,11 @@ const paddingAllResToMapped = async (options: { injectsCode: TOptions['injectsCo
 		const compressedSize = zipStr.length;
 		const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
 
-		console.info(`[压缩] 资源包大小 - 原始: ${(originalSize / 1024).toFixed(2)}kb, 压缩后: ${(compressedSize / 1024).toFixed(2)}kb`);
+		console.log(`[压缩] 资源包大小 - 原始: ${(originalSize / 1024).toFixed(2)}kb, 压缩后: ${(compressedSize / 1024).toFixed(2)}kb`);
 
 		if (zipStr.length < resStr.length) {
 			compDiff = resStr.length - zipStr.length;
-			console.info(`[压缩] 压缩率: ${ratio}%, 节省空间: ${(compDiff / 1024).toFixed(2)}kb`);
+			console.log(`[压缩] 压缩率: ${ratio}%, 节省空间: ${(compDiff / 1024).toFixed(2)}kb`);
 			resStr = zipStr;
 		} else {
 			console.warn('[压缩] 压缩后文件更大,将使用原始资源包');
@@ -185,13 +185,13 @@ const paddingAllResToMapped = async (options: { injectsCode: TOptions['injectsCo
 	}
 
 	if (compDiff > 0) {
-		console.info('[压缩] 注入解压缩库...');
+		console.log('[压缩] 注入解压缩库...');
 		// Inject decompression library
 		$(`<script data-id="jszip">${jszipCode}</script>`).appendTo('body');
 		// Inject compressed files
 		$(`<script data-id="adapter-zip-0">window.__adapter_zip__="${resStr}";</script>`).appendTo('body');
 	} else {
-		console.info('[压缩] 使用未压缩资源包');
+		console.log('[压缩] 使用未压缩资源包');
 		// Inject uncompressed files
 		$(`<script data-id="adapter-resource-0">window.__adapter_resource__=${resStr}</script>`).appendTo('body');
 	}
@@ -232,7 +232,7 @@ export const genSingleFile = async (options: TOptions) => {
 
 	writeToPath(singleFilePath, $.html());
 
-	console.info(`[合并] 生成单文件成功, 文件大小: ${(getFileSize(singleFilePath) / 1024).toFixed(2)}kb`);
+	console.log(`[合并] 生成单文件成功, 文件大小: ${(getFileSize(singleFilePath) / 1024).toFixed(2)}kb`);
 
 	return {
 		resMapper,

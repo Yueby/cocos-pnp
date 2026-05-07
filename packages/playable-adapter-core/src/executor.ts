@@ -15,32 +15,32 @@ export const execAdapter = async (options: TOptions, config?: { mode: TMode; }) 
   mountGlobalVars(options);
   try {
     try {
-      console.info('【执行图片压缩】');
+      console.log('【执行图片压缩】');
       const { success, msg } = await execTinify();
       if (!success) {
         console.warn(`${msg}，跳过图片压缩`);
       } else {
-        console.info('图片压缩完成');
+        console.log('图片压缩完成');
       }
     } catch (error) {
       console.error('图片压缩失败:', error);
     }
 
-    console.info('【生成单文件】');
+    console.log('【生成单文件】');
     const { resMapper, compDiff } = await genSingleFile();
-    console.info('单文件生成完成');
+    console.log('单文件生成完成');
 
     const { orientation = 'auto', lang } = getAdapterRCJson() || {};
     const { mode = 'parallel' } = config ?? { mode: 'parallel' };
 
-    console.info('【生成渠道包】');
+    console.log('【生成渠道包】');
     await genChannelsPkg({
       orientation,
       resMapper,
       compDiff,
       lang
     }, mode);
-    console.info('渠道包生成完成');
+    console.log('渠道包生成完成');
   } finally {
     unmountGlobalVars();
   }

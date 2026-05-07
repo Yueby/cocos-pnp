@@ -5,70 +5,49 @@ type TChannelExport = { [key in TChannel]: (options: TChannelPkgOptions) => Prom
 
 export type TMode = 'parallel' | 'serial';
 
-type TGenParams = { channelExports: TChannelExport; options: TChannelPkgOptions; resolve: (value: void | PromiseLike<void>) => void; reject: (reason?: any) => void };
+const getChannelKeys = (channelExports: TChannelExport): TChannel[] => {
+	const { exportChannels = [] } = getAdapterRCJson() || {};
+	const channelKeys = exportChannels.length === 0 ? <TChannel[]>Object.keys(channelExports) : exportChannels;
 
-const serialGen = async (params: TGenParams) => {
-	const { channelExports, options, resolve, reject } = params;
-	try {
-		const { exportChannels = [] } = getAdapterRCJson() || {};
-
-		let channelKeys = exportChannels.length === 0 ? <TChannel[]>Object.keys(channelExports) : exportChannels;
-		console.info(`[打包] 将生成 ${channelKeys.length} 个渠道包`);
-		console.info(`[打包] 渠道列表: ${channelKeys.join(', ')}`);
-
-		for (let index = 0; index < channelKeys.length; index++) {
-			const key = channelKeys[index];
-			console.info(`[打包] 开始生成 ${key} 渠道包 (${index + 1}/${channelKeys.length})`);
-			await channelExports[key](options);
+	for (const key of channelKeys) {
+		if (!channelExports[key]) {
+			throw new Error(`[打包] 未支持的渠道: ${key}`);
 		}
+	}
 
-		resolve();
-	} catch (error) {
-		reject(error);
+	console.log(`[打包] 将生成 ${channelKeys.length} 个渠道包`);
+	console.log(`[打包] 渠道列表: ${channelKeys.join(', ')}`);
+
+	return channelKeys;
+};
+
+const serialGen = async (channelExports: TChannelExport, options: TChannelPkgOptions) => {
+	const channelKeys = getChannelKeys(channelExports);
+
+	for (let index = 0; index < channelKeys.length; index++) {
+		const key = channelKeys[index];
+		console.log(`[打包] 开始生成 ${key} 渠道包 (${index + 1}/${channelKeys.length})`);
+		await channelExports[key](options);
+		console.log(`[打包] ${key} 渠道包生成完成 (${index + 1}/${channelKeys.length})`);
 	}
 };
 
-const parallelGen = (params: TGenParams) => {
-	const { channelExports, options, resolve, reject } = params;
+const parallelGen = async (channelExports: TChannelExport, options: TChannelPkgOptions) => {
+	const channelKeys = getChannelKeys(channelExports);
 
-	const { exportChannels = [] } = getAdapterRCJson() || {};
-
-	let channelKeys = exportChannels.length === 0 ? <TChannel[]>Object.keys(channelExports) : exportChannels;
-	console.info(`[打包] 将生成 ${channelKeys.length} 个渠道包`);
-	console.info(`[打包] 渠道列表: ${channelKeys.join(', ')}`);
-
-	let tasks: Promise<void>[] = [];
-	channelKeys.forEach((key: TChannel) => {
-		if (exportChannels.length === 0 || exportChannels.includes(key)) {
-			console.info(`[打包] 开始生成 ${key} 渠道包`);
-			tasks.push(channelExports[key](options));
-		}
-	});
-	Promise.all(tasks)
-		.then(() => {
-			resolve();
-		})
-		.catch((err) => {
-			console.error('[打包] 生成渠道包失败:', err);
-			reject(err);
-		});
+	await Promise.all(channelKeys.map(async (key: TChannel) => {
+		console.log(`[打包] 开始生成 ${key} 渠道包`);
+		await channelExports[key](options);
+		console.log(`[打包] ${key} 渠道包生成完成`);
+	}));
 };
 
-export const genChannelsPkg = (channelExports: TChannelExport, options: TChannelPkgOptions, mode?: TMode): Promise<void> => {
-	return new Promise(async (resolve, reject) => {
-		console.info(`[打包] 使用${mode === 'serial' ? '串行' : '并行'}模式生成渠道包`);
-		mode === 'serial'
-			? serialGen({
-					channelExports,
-					options,
-					resolve,
-					reject
-			  })
-			: parallelGen({
-					channelExports,
-					options,
-					resolve,
-					reject
-			  });
-	});
+export const genChannelsPkg = async (channelExports: TChannelExport, options: TChannelPkgOptions, mode?: TMode): Promise<void> => {
+	console.log(`[打包] 使用${mode === 'serial' ? '串行' : '并行'}模式生成渠道包`);
+	if (mode === 'serial') {
+		await serialGen(channelExports, options);
+		return;
+	}
+
+	await parallelGen(channelExports, options);
 };

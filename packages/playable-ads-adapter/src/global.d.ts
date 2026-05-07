@@ -39,26 +39,7 @@ type TPlatform =
 
 type TChannel = 'AppLovin' | 'Facebook' | 'Google' | 'IronSource' | 'Liftoff' | 'Mintegral' | 'Moloco' | 'Pangle' | 'Rubeex' | 'Tiktok' | 'Unity' | 'SnapChat' | 'Yandex' | 'Bigo';
 
-type TIpcMsgEvent =
-	/** 编译状态更新时，发送的消息 */
-	| 'builder:state-changed'
-	/** 查看构建的选项 */
-	| 'builder:query-build-options'
-	/** 开始构建任务 */
-	| 'builder:start-task';
-
 declare namespace Editor {
-	type ListenEvent = 'before-change-files' | 'build-start' | 'build-finished';
-
-	const Builder: {
-		on(event: ListenEvent, eventFn: (options: any, callback: () => void) => void);
-		removeListener(event: ListenEvent, eventFn: (options: any, callback: () => void) => void);
-	};
-
-	const Ipc: {
-		sendToMain(event: TIpcMsgEvent, ...arg: any[]): void;
-	};
-
 	const Profile: {
 		getConfig(name: string, key?: string, type?: 'default' | 'global' | 'local'): Promise<any>;
 		setConfig(name: string, key: string, value: any, type?: 'default' | 'global' | 'local'): Promise<void>;

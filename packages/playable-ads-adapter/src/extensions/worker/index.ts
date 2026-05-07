@@ -1,6 +1,6 @@
 import { execAdapter } from 'playable-adapter-core';
 import { parentPort, workerData } from 'worker_threads';
-import { createLogPayload, TLogLevel, toAdapterLogEvent } from '../logger';
+import { createLogPayload, formatLogMessage, TLogLevel, toAdapterLogEvent } from '../logger';
 
 const overrideConsole = () => {
 	const originalConsole = {
@@ -12,11 +12,12 @@ const overrideConsole = () => {
 	};
 
 	const forward = (level: TLogLevel, args: unknown[]) => {
+		const payload = createLogPayload(level, args);
 		parentPort?.postMessage({
 			event: toAdapterLogEvent(level),
-			msg: createLogPayload(level, args)
+			msg: payload
 		});
-		originalConsole[level](...args);
+		originalConsole[level](formatLogMessage(level, [payload.message]));
 	};
 
 	console.debug = (...args: unknown[]) => forward('debug', args);

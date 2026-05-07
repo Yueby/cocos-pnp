@@ -6,6 +6,7 @@ import path from 'path';
 const MAX_CONCURRENCY = 5;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
+const TINIFY_REQUEST_TIMEOUT_MS = 60_000;
 
 type TinifyErrorType = 'AccountError' | 'ClientError' | 'ServerError' | 'ConnectionError' | 'UnknownError';
 
@@ -38,17 +39,21 @@ const postFileToRemote = async (filePath: string, data: Buffer): Promise<void> =
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
+      console.log(`[压缩] 上传 ${filePath} (${attempt}/${MAX_RETRIES})`);
       const uploadRes = await Axios.request({
         method: 'post',
         url: 'https://api.tinify.com/shrink',
         auth: { username: `api:${tinifyApiKey}`, password: '' },
         data,
+        timeout: TINIFY_REQUEST_TIMEOUT_MS,
       });
 
+      console.log(`[压缩] 下载 ${filePath} (${attempt}/${MAX_RETRIES})`);
       const fileRes = await Axios.request({
         method: 'get',
         url: uploadRes.data.output.url,
         responseType: 'arraybuffer',
+        timeout: TINIFY_REQUEST_TIMEOUT_MS,
       });
 
       const originalSize = data.length;
@@ -56,7 +61,7 @@ const postFileToRemote = async (filePath: string, data: Buffer): Promise<void> =
       const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
 
       writeToPath(filePath, new Uint8Array(fileRes.data));
-      console.info(`[压缩] ${filePath} (${(originalSize / 1024).toFixed(1)}kb -> ${(compressedSize / 1024).toFixed(1)}kb, -${ratio}%)`);
+      console.log(`[压缩] ${filePath} (${(originalSize / 1024).toFixed(1)}kb -> ${(compressedSize / 1024).toFixed(1)}kb, -${ratio}%)`);
       return;
     } catch (err) {
       lastError = err;
@@ -114,20 +119,20 @@ export const execTinify = async (): Promise<{ success: boolean; msg: string }> =
   const originPkgPath = getOriginPkgPath();
   const allImgFiles = getAllFilesFormDir(originPkgPath).filter(checkImgType);
 
-  console.info(`[压缩] 扫描目录: ${originPkgPath}`);
-  console.info(`[压缩] 发现 ${allImgFiles.length} 个图片文件:`);
+  console.log(`[压缩] 扫描目录: ${originPkgPath}`);
+  console.log(`[压缩] 发现 ${allImgFiles.length} 个图片文件:`);
   for (const f of allImgFiles) {
     const baseName = path.basename(f, path.extname(f));
-    console.info(`[压缩]   文件名: ${baseName}  (${path.basename(f)})`);
+    console.log(`[压缩]   文件名: ${baseName}  (${path.basename(f)})`);
   }
 
   const skippedFiles = allImgFiles.filter(f => isUuidSkipped(f, tinifySkipUuids));
   const files = allImgFiles.filter(f => !isUuidSkipped(f, tinifySkipUuids));
 
   if (skippedFiles.length > 0) {
-    console.info(`[压缩] 跳过 ${skippedFiles.length} 个 UUID 匹配的图片`);
+    console.log(`[压缩] 跳过 ${skippedFiles.length} 个 UUID 匹配的图片`);
     for (const f of skippedFiles) {
-      console.info(`[压缩]   跳过: ${path.basename(f)}`);
+      console.log(`[压缩]   跳过: ${path.basename(f)}`);
     }
   }
 
@@ -135,7 +140,7 @@ export const execTinify = async (): Promise<{ success: boolean; msg: string }> =
     return { success: true, msg: '未发现需要压缩的图片' };
   }
 
-  console.info(`[压缩] 共发现 ${files.length} 个图片文件，并发数: ${MAX_CONCURRENCY}`);
+  console.log(`[压缩] 共发现 ${files.length} 个图片文件，并发数: ${MAX_CONCURRENCY}`);
 
   const tasks = files.map((filePath) => () => postFileToRemote(filePath, readFileSync(filePath)));
   const results = await runWithConcurrency(tasks, MAX_CONCURRENCY);

@@ -220,7 +220,7 @@ const withTempDir = async <T>(channelPath: string, callback: (tempDir: string) =
 
 export const exportSingleFile = async (singleFilePath: string, options: TBuilderOptions) => {
 	const { channel, transform } = options;
-	console.info(`[适配] 开始适配 ${channel} 渠道`);
+	console.log(`[适配] 开始适配 ${channel} 渠道`);
 
 	try {
 		const { channelPath, outputFileName } = createChannelExportDir(channel);
@@ -234,7 +234,7 @@ export const exportSingleFile = async (singleFilePath: string, options: TBuilder
 			await transform(channelPath);
 		}
 
-		console.info(`[适配] ${channel} 渠道适配完成`);
+		console.log(`[适配] ${channel} 渠道适配完成`);
 	} catch (error) {
 		console.error(`[适配] ${channel} 渠道适配失败:`, error);
 		throw error;
@@ -243,7 +243,7 @@ export const exportSingleFile = async (singleFilePath: string, options: TBuilder
 
 export const exportZipFromPkg = async (options: TBuilderOptions) => {
 	const { channel, transform } = options;
-	console.info(`[适配] 开始适配 ${channel} 渠道`);
+	console.log(`[适配] 开始适配 ${channel} 渠道`);
 
 	try {
 		const { channelPath, outputFileName } = createChannelExportDir(channel);
@@ -268,7 +268,7 @@ export const exportZipFromPkg = async (options: TBuilderOptions) => {
 			await createZip(channelPath, [tempDir], outputFileName, newZip);
 		});
 
-		console.info(`[适配] ${channel} 渠道适配完成`);
+		console.log(`[适配] ${channel} 渠道适配完成`);
 	} catch (error) {
 		console.error(`[适配] ${channel} 渠道适配失败:`, error);
 		throw error;
@@ -277,7 +277,7 @@ export const exportZipFromPkg = async (options: TBuilderOptions) => {
 
 export const exportZipFromSingleFile = async (singleFilePath: string, options: TZipFromSingleFileOptions) => {
 	const { channel, transform, transformScript, exportType } = options;
-	console.info(`[适配] 开始适配 ${channel} 渠道`);
+	console.log(`[适配] 开始适配 ${channel} 渠道`);
 
 	try {
 		const { channelPath, outputFileName } = createChannelExportDir(channel);
@@ -317,7 +317,7 @@ export const exportZipFromSingleFile = async (singleFilePath: string, options: T
 			await createZip(channelPath, [tempDir], outputFileName, newZip);
 		});
 
-		console.info(`[适配] ${channel} 渠道适配完成`);
+		console.log(`[适配] ${channel} 渠道适配完成`);
 	} catch (error) {
 		console.error(`[适配] ${channel} 渠道适配失败:`, error);
 		throw error;
@@ -346,11 +346,19 @@ export const createZip = async (destPath: string, filePaths: string[], zipName: 
 			}
 		}
 		// 生成 zip 文件的内容（使用 DEFLATE 压缩）
+		console.log(`[创建zip文件] 开始生成 ${zipName}.zip`);
+		let lastProgress = -10;
 		const zipContent = await zip!.generateAsync({ 
 			type: 'nodebuffer',
 			compression: 'DEFLATE',
 			compressionOptions: {
 				level: 5 // 平衡压缩级别 (1-9)
+			}
+		}, (metadata) => {
+			const progress = Math.floor(metadata.percent / 10) * 10;
+			if (progress > lastProgress) {
+				lastProgress = progress;
+				console.log(`[创建zip文件] ${zipName}.zip 进度 ${progress}%`);
 			}
 		});
 
@@ -371,7 +379,7 @@ export const createZip = async (destPath: string, filePaths: string[], zipName: 
 			}
 
 			writeFileSync(file_path, new Uint8Array(zipContent));
-			console.info(`[创建zip文件] 成功创建zip文件: ${file_path}`);
+			console.log(`[创建zip文件] 成功创建zip文件: ${file_path}`);
 		} catch (err: any) {
 			if (err.code === 'EBUSY') {
 				console.error(`文件 ${file_path} 正在被其他程序使用，无法写入。请关闭可能正在使用该文件的程序后重试。`);

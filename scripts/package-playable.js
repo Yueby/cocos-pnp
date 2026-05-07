@@ -8,9 +8,11 @@ const PLUGIN_PACKAGE_ROOT = path.join(REPO_ROOT, 'packages', PLUGIN_NAME);
 const PLUGIN_DIST = path.join(PLUGIN_PACKAGE_ROOT, 'dist');
 const PLUGIN_BUILD_DIR = path.join(PLUGIN_DIST, PLUGIN_NAME);
 const ZIP_PATH = path.join(PLUGIN_DIST, `${PLUGIN_NAME}.zip`);
+const BUILD_TIMEOUT_MS = 30 * 60 * 1000;
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
+    let settled = false;
     const child = spawn(command, args, {
       cwd: REPO_ROOT,
       stdio: 'inherit',
@@ -19,14 +21,28 @@ function run(command, args, options = {}) {
       ...options,
     });
 
-    child.on('error', reject);
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill();
+      reject(new Error(`${command} ${args.join(' ')} timed out after ${BUILD_TIMEOUT_MS / 1000}s`));
+    }, BUILD_TIMEOUT_MS);
+
+    const finish = (cb, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cb(value);
+    };
+
+    child.on('error', (error) => finish(reject, error));
     child.on('close', (code) => {
       if (code === 0) {
-        resolve();
+        finish(resolve);
         return;
       }
 
-      reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));
+      finish(reject, new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));
     });
   });
 }
@@ -52,12 +68,20 @@ async function createZip() {
   const JSZip = require(require.resolve('jszip', { paths: [PLUGIN_PACKAGE_ROOT] }));
   const zip = new JSZip();
 
+  console.log(`Add files from ${PLUGIN_BUILD_DIR}`);
   addDirectoryToZip(zip, PLUGIN_BUILD_DIR, path.dirname(PLUGIN_BUILD_DIR));
 
+  let lastProgress = -10;
   const content = await zip.generateAsync({
     type: 'nodebuffer',
     compression: 'DEFLATE',
     compressionOptions: { level: 9 },
+  }, (metadata) => {
+    const progress = Math.floor(metadata.percent / 10) * 10;
+    if (progress > lastProgress) {
+      lastProgress = progress;
+      console.log(`Zip progress: ${progress}%`);
+    }
   });
 
   fs.writeFileSync(ZIP_PATH, content);

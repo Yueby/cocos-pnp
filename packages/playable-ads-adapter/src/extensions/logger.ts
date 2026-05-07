@@ -9,7 +9,22 @@ export type TLogPayload = {
 
 export const ADAPTER_LOG_EVENT_PREFIX = 'adapter:';
 
+const LOG_LEVEL_LABEL: Record<TLogLevel, string> = {
+	debug: 'DEBUG',
+	log: 'LOG',
+	info: 'INFO',
+	warn: 'WARN',
+	error: 'ERROR'
+};
+
 export const getLogPrefix = () => `[${PACKAGE_NAME}]`;
+
+const padTime = (value: number) => value.toString().padStart(2, '0');
+
+export const getLogTime = () => {
+	const now = new Date();
+	return `${padTime(now.getHours())}:${padTime(now.getMinutes())}:${padTime(now.getSeconds())}`;
+};
 
 const formatError = (error: Error) => {
 	return error.stack || error.message || String(error);
@@ -41,8 +56,15 @@ export const formatLogArg = (arg: unknown): string => {
 
 export const formatLogArgs = (args: unknown[]) => args.map(formatLogArg).join(' ');
 
+export const isFormattedAdapterLog = (message: string) => message.startsWith(`${getLogPrefix()}[`);
+
+export const formatLogMessage = (level: TLogLevel, args: unknown[]) => {
+	const message = formatLogArgs(args);
+	return isFormattedAdapterLog(message) ? message : `${getLogPrefix()}[${LOG_LEVEL_LABEL[level]}][${getLogTime()}] ${message}`;
+};
+
 const print = (level: TLogLevel, args: unknown[]) => {
-	console[level](getLogPrefix(), ...args);
+	console[level](formatLogMessage(level, args));
 };
 
 export const logger = {

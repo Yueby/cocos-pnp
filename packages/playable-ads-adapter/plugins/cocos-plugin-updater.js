@@ -26,8 +26,11 @@ export default function cocosPluginUpdater(options) {
       const normalizedDest = normalizeWindowsDrivePath(dest);
 
       console.log(`cocos-plugin-update copy folder to ${normalizedDest}`);
+      console.log('cocos-plugin-update create parent folder...');
       await fs.mkdir(dirname(normalizedDest), { recursive: true });
+      console.log('cocos-plugin-update remove old folder...');
       await fs.rm(normalizedDest, { recursive: true, force: true });
+      console.log('cocos-plugin-update copy new folder...');
       await fs.cp(src, normalizedDest, { recursive: true });
       console.log('cocos-plugin-update copy folder success');
     }
