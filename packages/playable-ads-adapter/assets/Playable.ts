@@ -47,7 +47,7 @@ window.playable = {
 		try {
 			// @ts-ignore
 			if (typeof showAds !== 'function') {
-				console.warn('[Playable] Ads not supported in current environment');
+				console.warn('[Playable] 当前环境不支持广告');
 				onError?.();
 				return;
 			}
@@ -55,7 +55,7 @@ window.playable = {
 			showAds();
 			onSuccess?.();
 		} catch (error) {
-			console.error('[Playable] showAds error:', error);
+			console.error('[Playable] showAds 执行失败:', error);
 			onError?.();
 		}
 	},

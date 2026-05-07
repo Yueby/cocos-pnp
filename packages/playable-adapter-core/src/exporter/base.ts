@@ -12,6 +12,8 @@ import path, { basename, extname, join } from 'path';
 
 const FILE_MAX_SIZE = MAX_ZIP_SIZE * 0.8;
 
+const sanitizeOutputNamePart = (value: string) => value.replace(/[\\/:*?"<>|.]+/g, '').trim();
+
 const globalReplacer = (options: Pick<TBuilderOptions, 'channel' | 'resMapper'> & { $: CheerioAPI; }) => {
 	const { channel, resMapper } = options;
 	if (!resMapper) {
@@ -120,21 +122,17 @@ const fillCodeToHTML = ($: CheerioAPI, options: TBuilderOptions) => {
 
 // 修复初始化脚本的公共方法
 const fixInitScriptInHTML = ($: CheerioAPI) => {
-	console.log('开始检查脚本内容...');
 	$('script').each((index, element) => {
 		const content = $(element).html();
 		if (content) {
 			// 使用正则表达式匹配，忽略空格和换行
 			const regex = /__adapter_init_js\s*\(\s*\)\s*;/g;
 			if (regex.test(content)) {
-				console.log('找到 __adapter_init_js 函数调用：', content);
 				const newContent = content.replace(regex, '__adapter_init_js(!0);');
 				$(element).html(newContent);
-				console.log('替换后的内容：', newContent);
 			}
 		}
 	});
-	console.log('脚本检查完成');
 };
 
 // 创建渠道导出目录的公共方法
@@ -142,7 +140,9 @@ const createChannelExportDir = (channel: string) => {
 	const { fileName = '', lang = '' } = getAdapterRCJson() || {};
 	const projectBuildPath = getGlobalProjectBuildPath();
 	const channelPath = join(projectBuildPath, channel.toLowerCase());
-	const outputFileName = `${fileName}${lang}${channel.toLowerCase()}`;
+	const safeFileName = sanitizeOutputNamePart(fileName);
+	const safeLang = sanitizeOutputNamePart(lang);
+	const outputFileName = `${safeFileName}${safeLang}${channel.toLowerCase()}`;
 
 	// 确保渠道目录存在
 	mkdirSync(channelPath, { recursive: true });
@@ -169,7 +169,7 @@ const processHTML = async ($: CheerioAPI, options: TBuilderOptions | TZipFromSin
 	const { transformHTML, fixInitScript } = options;
 
 	if (fixInitScript) {
-		console.log('修复init.js:' + options.channel);
+		console.log(`[适配] ${options.channel} 渠道修复初始化脚本`);
 		fixInitScriptInHTML($);
 	}
 
@@ -335,7 +335,7 @@ export const createZip = async (destPath: string, filePaths: string[], zipName: 
 		for (let filePath of filePaths) {
 			// 检查文件是否存在
 			if (!existsSync(filePath)) {
-				console.error(`[创建zip文件] file ${filePath} not exists.`);
+				console.error(`[创建zip文件] 文件不存在：${filePath}`);
 				continue;
 			}
 
@@ -346,19 +346,11 @@ export const createZip = async (destPath: string, filePaths: string[], zipName: 
 			}
 		}
 		// 生成 zip 文件的内容（使用 DEFLATE 压缩）
-		console.log(`[创建zip文件] 开始生成 ${zipName}.zip`);
-		let lastProgress = -10;
 		const zipContent = await zip!.generateAsync({ 
 			type: 'nodebuffer',
 			compression: 'DEFLATE',
 			compressionOptions: {
 				level: 5 // 平衡压缩级别 (1-9)
-			}
-		}, (metadata) => {
-			const progress = Math.floor(metadata.percent / 10) * 10;
-			if (progress > lastProgress) {
-				lastProgress = progress;
-				console.log(`[创建zip文件] ${zipName}.zip 进度 ${progress}%`);
 			}
 		});
 
@@ -379,7 +371,6 @@ export const createZip = async (destPath: string, filePaths: string[], zipName: 
 			}
 
 			writeFileSync(file_path, new Uint8Array(zipContent));
-			console.log(`[创建zip文件] 成功创建zip文件: ${file_path}`);
 		} catch (err: any) {
 			if (err.code === 'EBUSY') {
 				console.error(`文件 ${file_path} 正在被其他程序使用，无法写入。请关闭可能正在使用该文件的程序后重试。`);

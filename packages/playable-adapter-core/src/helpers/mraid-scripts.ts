@@ -30,13 +30,13 @@ export function createMraidScript(config: MraidConfig): string {
   parts.push(`function Start(){if(mraid.getState()==='loading'){mraid.addEventListener('ready',onSdkReady);}else{onSdkReady();}}`)
   
   // onSdkReady 函数
-  let readyBody = `console.log('[Playable] MRAID SDK Ready');`
+  let readyBody = `console.log('[Playable] MRAID SDK 已就绪');`
   
   // 添加 stateChange 监听
   if (config.stateChange) {
     const stateLogic = typeof config.stateChange === 'string' 
       ? config.stateChange 
-      : `console.log('[Playable] MRAID State:',state);`
+      : `console.log('[Playable] MRAID 状态:',state);`
     readyBody += `mraid.addEventListener('stateChange',function(state){${stateLogic}});`
   }
   
@@ -63,7 +63,7 @@ export function createMraidScript(config: MraidConfig): string {
     parts.push(`window.checkViewable=function(){if(typeof mraid!=='undefined'){if(mraid.isViewable()){resumeGame();}else{pauseGame();}}else{resumeGame();}};`)
     
     // resumeGame
-    parts.push(`function resumeGame(){console.log('[Playable] Showing/Resuming ad...');if(typeof cc!=='undefined'&&cc.director){cc.director.resume();cc.game.resume();}}`)
+    parts.push(`function resumeGame(){console.log('[Playable] 显示/恢复广告...');if(typeof cc!=='undefined'&&cc.director){cc.director.resume();cc.game.resume();}}`)
     
     // pauseGame
     parts.push(`function pauseGame(){if(typeof cc!=='undefined'&&cc.director){cc.director.pause();cc.game.pause();}}`)
@@ -72,18 +72,17 @@ export function createMraidScript(config: MraidConfig): string {
   // 添加 viewableChange 处理函数
   if (config.viewableChange) {
     if (config.needGameControl) {
-      parts.push(`function viewableChangeHandler(viewable){console.log('[Playable] MRAID Viewable:',viewable);window.checkViewable();}`)
+      parts.push(`function viewableChangeHandler(viewable){console.log('[Playable] MRAID 可见状态:',viewable);window.checkViewable();}`)
     } else {
       const viewableLogic = typeof config.viewableChange === 'string'
         ? config.viewableChange
-        : config.onViewableChange || `console.log('[Playable] MRAID Viewable:',viewable);if(viewable){resumeGame();}`
+        : config.onViewableChange || `console.log('[Playable] MRAID 可见状态:',viewable);if(viewable){resumeGame();}`
       parts.push(`function viewableChangeHandler(viewable){${viewableLogic}}`)
     }
   }
   
   // 立即初始化
-  parts.push(`if(typeof mraid!=='undefined'){Start();}else{console.warn('[Playable] MRAID Not available (test/preview mode)');}`)
+  parts.push(`if(typeof mraid!=='undefined'){Start();}else{console.warn('[Playable] MRAID 不可用（测试/预览模式）');}`)
   
   return `<script>(function(){${parts.join('')}})();</script>`
 }
-

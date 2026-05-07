@@ -49,7 +49,7 @@ export const rmSync = (dest: string) => {
      */
     rmdirSync(dest);
   } else {
-    console.warn("The given path does not exist, please provide the correct path");
+    console.warn("指定路径不存在，请提供正确路径");
   }
 }
 

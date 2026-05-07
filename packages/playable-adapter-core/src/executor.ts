@@ -18,7 +18,7 @@ export const execAdapter = async (options: TOptions, config?: { mode: TMode; }) 
       console.log('【执行图片压缩】');
       const { success, msg } = await execTinify();
       if (!success) {
-        console.warn(`${msg}，跳过图片压缩`);
+        console.warn(msg);
       } else {
         console.log('图片压缩完成');
       }

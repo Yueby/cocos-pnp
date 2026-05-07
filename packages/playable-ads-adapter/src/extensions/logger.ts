@@ -10,11 +10,11 @@ export type TLogPayload = {
 export const ADAPTER_LOG_EVENT_PREFIX = 'adapter:';
 
 const LOG_LEVEL_LABEL: Record<TLogLevel, string> = {
-	debug: 'DEBUG',
-	log: 'LOG',
-	info: 'INFO',
-	warn: 'WARN',
-	error: 'ERROR'
+	debug: '调试',
+	log: '日志',
+	info: '信息',
+	warn: '警告',
+	error: '错误'
 };
 
 export const getLogPrefix = () => `[${PACKAGE_NAME}]`;
@@ -73,6 +73,32 @@ export const logger = {
 	info: (...args: unknown[]) => print('info', args),
 	warn: (...args: unknown[]) => print('warn', args),
 	error: (...args: unknown[]) => print('error', args)
+};
+
+export const withFormattedConsole = async <T>(task: () => Promise<T>) => {
+	const originalConsole = {
+		debug: console.debug,
+		log: console.log,
+		info: console.info,
+		warn: console.warn,
+		error: console.error
+	};
+
+	console.debug = (...args: unknown[]) => originalConsole.debug.call(console, formatLogMessage('debug', args));
+	console.log = (...args: unknown[]) => originalConsole.log.call(console, formatLogMessage('log', args));
+	console.info = (...args: unknown[]) => originalConsole.info.call(console, formatLogMessage('info', args));
+	console.warn = (...args: unknown[]) => originalConsole.warn.call(console, formatLogMessage('warn', args));
+	console.error = (...args: unknown[]) => originalConsole.error.call(console, formatLogMessage('error', args));
+
+	try {
+		return await task();
+	} finally {
+		console.debug = originalConsole.debug;
+		console.log = originalConsole.log;
+		console.info = originalConsole.info;
+		console.warn = originalConsole.warn;
+		console.error = originalConsole.error;
+	}
 };
 
 export const toAdapterLogEvent = (level: TLogLevel) => `${ADAPTER_LOG_EVENT_PREFIX}${level}` as const;

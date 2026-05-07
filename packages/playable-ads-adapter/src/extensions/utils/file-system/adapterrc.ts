@@ -1,4 +1,5 @@
 import { ADAPTER_RC_PATH } from '@/extensions/constants';
+import { logger } from '@/extensions/logger';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { readToPath } from './base';
@@ -28,7 +29,7 @@ export const readAdapterRCFileBase = (): TAdapterRC | null => {
 		let config = <TAdapterRC>JSON.parse(fileContent);
 		return config;
 	} catch (error) {
-		console.error('读取配置文件失败:', error);
+		logger.error('读取配置文件失败:', error);
 		return null;
 	}
 };

@@ -46,18 +46,18 @@ const paddingStyleTags = ($: CheerioAPI) => {
 		.find('style')
 		.each((_index, elem) => {
 			// Match css url
-			const cssUrlReg = /url\("?'?.*"?'?\)/g;
+			const cssUrlReg = /url\((['"]?)(.*?)\1\)/g;
 			let styleTagStr = $(elem).html() || '';
 
 			const matchStrList = styleTagStr.match(cssUrlReg);
 			if (!matchStrList) return;
 
 			matchStrList.forEach((str) => {
-				// Match url
-				const strReg = /"|'|url|\(|\)/g;
-				const imgUrl = str.replace(strReg, '');
+				const urlMatch = str.match(/url\((['"]?)(.*?)\1\)/);
+				const imgUrl = urlMatch?.[2];
+				if (!imgUrl) return;
 				const imgBase64 = enableSplash ? getBase64FromFile(join(originPkgPath, imgUrl)) : TRANSPARENT_GIF;
-				styleTagStr = styleTagStr.replace(cssUrlReg, `url(${imgBase64})`);
+				styleTagStr = styleTagStr.replace(str, `url(${imgBase64})`);
 			});
 
 			$(elem).html(styleTagStr).html();

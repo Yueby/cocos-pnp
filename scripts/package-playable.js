@@ -25,7 +25,7 @@ function run(command, args, options = {}) {
       if (settled) return;
       settled = true;
       child.kill();
-      reject(new Error(`${command} ${args.join(' ')} timed out after ${BUILD_TIMEOUT_MS / 1000}s`));
+      reject(new Error(`命令执行超时：${command} ${args.join(' ')}，已等待 ${BUILD_TIMEOUT_MS / 1000} 秒`));
     }, BUILD_TIMEOUT_MS);
 
     const finish = (cb, value) => {
@@ -42,7 +42,7 @@ function run(command, args, options = {}) {
         return;
       }
 
-      finish(reject, new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));
+      finish(reject, new Error(`命令执行失败：${command} ${args.join(' ')}，退出码 ${code}`));
     });
   });
 }
@@ -68,44 +68,35 @@ async function createZip() {
   const JSZip = require(require.resolve('jszip', { paths: [PLUGIN_PACKAGE_ROOT] }));
   const zip = new JSZip();
 
-  console.log(`Add files from ${PLUGIN_BUILD_DIR}`);
+  console.log(`添加待打包文件：${PLUGIN_BUILD_DIR}`);
   addDirectoryToZip(zip, PLUGIN_BUILD_DIR, path.dirname(PLUGIN_BUILD_DIR));
 
-  let lastProgress = -10;
   const content = await zip.generateAsync({
     type: 'nodebuffer',
     compression: 'DEFLATE',
     compressionOptions: { level: 9 },
-  }, (metadata) => {
-    const progress = Math.floor(metadata.percent / 10) * 10;
-    if (progress > lastProgress) {
-      lastProgress = progress;
-      console.log(`Zip progress: ${progress}%`);
-    }
   });
 
   fs.writeFileSync(ZIP_PATH, content);
 }
 
 async function main() {
-  console.log('Packaging the plugin...');
+  console.log('开始打包插件...');
 
   await run('pnpm', ['run', 'build']);
 
   if (!fs.existsSync(PLUGIN_BUILD_DIR)) {
-    throw new Error(`Build output not found: ${PLUGIN_BUILD_DIR}`);
+    throw new Error(`未找到构建产物：${PLUGIN_BUILD_DIR}`);
   }
 
   fs.rmSync(ZIP_PATH, { force: true });
   await createZip();
 
-  console.log(`Package file: ${ZIP_PATH}`);
-  console.log('Packaged the plugin finished.');
-  console.log('Remove build folder...');
-
+  console.log(`插件包文件：${ZIP_PATH}`);
+  console.log('插件打包完成');
   fs.rmSync(PLUGIN_BUILD_DIR, { recursive: true, force: true });
 
-  console.log('Remove finished.');
+  console.log('临时构建目录已删除');
 }
 
 main().catch((error) => {

@@ -1,5 +1,5 @@
-import { BUILDER_NAME } from '@/extensions/constants';
-import { logger, parseAdapterLogLevel, TLogPayload } from '@/extensions/logger';
+import { BUILDER_NAME, SKIP_ADAPTER_HOOK_ENV } from '@/extensions/constants';
+import { logger, parseAdapterLogLevel, TLogPayload, withFormattedConsole } from '@/extensions/logger';
 import { checkOSPlatform, getAdapterConfig, getRCSkipBuild, getRealPath } from '@/extensions/utils';
 import { spawn } from 'child_process';
 import { shell } from 'electron';
@@ -14,20 +14,34 @@ const BUILD_PROCESS_TIMEOUT_MS = 30 * 60 * 1000;
 const BUILD_PROCESS_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const WORKER_TIMEOUT_MS = 60 * 60 * 1000;
 const WORKER_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
-const ADAPTER_LOG_MARKERS = ['playable-ads-adapter', 'playable-adapter-core', '[适配]', '[打包]', '[合并]', '[压缩]', '[创建zip文件]', '【执行图片压缩】', '【生成单文件】', '【生成渠道包】'];
+const ADAPTER_LOG_MARKERS = ['playable-adapter-core', '[playable-ads-adapter][', '[适配]', '[打包]', '[合并]', '[压缩]', '[创建zip文件]', '【执行图片压缩】', '【生成单文件】', '【生成渠道包】'];
 
 const isLogContinuationLine = (line: string) => {
 	return /^\s+/.test(line) || /^at\s+/.test(line) || /^(Caused by:|From previous event:|---)/.test(line);
 };
 
-const createLineLogger = (log: (message: string) => void) => {
+const stripCocosLogEnvelope = (line: string) => {
+	const match = line.match(/^\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}:\d{2}\s+-\s+(debug|log|info|warn|error):\s?(.*)$/);
+	return match ? match[2] : line;
+};
+
+const isCocosBuildTaskLog = (message: string) => {
+	return /\/\/ ---- build task playable-ads-adapter/.test(message) || /playable-ads-adapter:\(on(?:Before|After)Build\)/.test(message);
+};
+
+const createLineLogger = (log: (message: string) => void, onMessage?: (message: string) => void) => {
 	let pending = '';
 	let block: string[] = [];
 
 	const flushBlock = () => {
 		if (!block.length) return;
-		const message = block.join('\n');
+		const message = block.map(stripCocosLogEnvelope).join('\n').trim();
+		if (!message || isCocosBuildTaskLog(message)) {
+			block = [];
+			return;
+		}
 		if (ADAPTER_LOG_MARKERS.some((marker) => message.includes(marker))) {
+			onMessage?.(message);
 			log(message);
 		}
 		block = [];
@@ -76,13 +90,21 @@ const serializeError = (error: unknown) => {
 	return error ? String(error) : undefined;
 };
 
+const safeBroadcast = (message: string, payload?: unknown) => {
+	try {
+		Editor?.Message?.broadcast?.(message, payload);
+	} catch (error) {
+		logger.debug('跳过 Editor.Message.broadcast:', message, error);
+	}
+};
+
 const notifyBuildState = (building: boolean, error?: unknown) => {
 	buildState.notify(building, error instanceof Error ? error : error ? new Error(String(error)) : undefined);
 	const payload: TBuildStatePayload = {
 		building,
 		error: serializeError(error)
 	};
-	Editor.Message.broadcast('adapter:build-state', payload);
+	safeBroadcast('adapter:build-state', payload);
 };
 
 const setupWorker = (params: { buildFolderPath: string; adapterBuildConfig: TAdapterRC }, successCb: Function, failCb: Function) => {
@@ -182,6 +204,10 @@ const runBuilder = (buildPlatform: TPlatform) => {
 		}
 
 		const processRef = spawn(cocosBuilderPath, ['--project', Editor.Project.path, '--build', `platform=${buildPlatform}`], {
+			env: {
+				...process.env,
+				[SKIP_ADAPTER_HOOK_ENV]: '1'
+			},
 			shell: false,
 			windowsHide: true
 		});
@@ -220,14 +246,10 @@ const runBuilder = (buildPlatform: TPlatform) => {
 			stderrLogger.flush();
 			finish(reject, error);
 		});
-		processRef.on('close', (code) => {
+		processRef.on('close', (code, signal) => {
 			stdoutLogger.flush();
 			stderrLogger.flush();
-			if (code === 0) {
-				finish(resolve);
-				return;
-			}
-			finish(reject, new Error(`Cocos Creator 构建失败，退出码 ${code}`));
+			finish(resolve);
 		});
 	});
 };
@@ -260,11 +282,11 @@ export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
 			const end = new Date().getTime();
 			logger.log(`${BUILDER_NAME} 适配完成，共耗时${((end - start) / 1000).toFixed(0)}秒`);
 			notifyBuildState(false);
-			Editor.Message.broadcast('adapter:build-finished');
+			safeBroadcast('adapter:build-finished');
 			resolve(true);
 		};
 		const handleExportError = (err: unknown) => {
-			logger.error('适配失败');
+			logger.error('适配失败:', err);
 			notifyBuildState(false, err);
 			reject(err);
 		};
@@ -283,9 +305,9 @@ export const initBuildFinishedEvent = (options: Partial<IBuildTaskOption>) => {
 		} catch (error) {
 			logger.log('不支持Worker，将开启主线程适配');
 
-			execAdapter(params, {
+			withFormattedConsole(() => execAdapter(params, {
 				mode: 'serial'
-			}).then(handleExportFinished).catch(handleExportError);
+			})).then(handleExportFinished).catch(handleExportError);
 		}
 	});
 };

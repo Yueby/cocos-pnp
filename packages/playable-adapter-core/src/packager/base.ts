@@ -7,7 +7,8 @@ export type TMode = 'parallel' | 'serial';
 
 const getChannelKeys = (channelExports: TChannelExport): TChannel[] => {
 	const { exportChannels = [] } = getAdapterRCJson() || {};
-	const channelKeys = exportChannels.length === 0 ? <TChannel[]>Object.keys(channelExports) : exportChannels;
+	const rawChannelKeys = exportChannels.length === 0 ? <TChannel[]>Object.keys(channelExports) : exportChannels;
+	const channelKeys = Array.from(new Set(rawChannelKeys));
 
 	for (const key of channelKeys) {
 		if (!channelExports[key]) {

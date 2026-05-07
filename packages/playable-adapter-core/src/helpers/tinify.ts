@@ -10,6 +10,14 @@ const TINIFY_REQUEST_TIMEOUT_MS = 60_000;
 
 type TinifyErrorType = 'AccountError' | 'ClientError' | 'ServerError' | 'ConnectionError' | 'UnknownError';
 
+const TINIFY_ERROR_TYPE_LABEL: Record<TinifyErrorType, string> = {
+  AccountError: '账户错误',
+  ClientError: '客户端错误',
+  ServerError: '服务端错误',
+  ConnectionError: '连接错误',
+  UnknownError: '未知错误',
+};
+
 const classifyError = (err: unknown): { type: TinifyErrorType; retryable: boolean; message: string } => {
   if (err instanceof AxiosError) {
     if (!err.response) {
@@ -39,7 +47,6 @@ const postFileToRemote = async (filePath: string, data: Buffer): Promise<void> =
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[压缩] 上传 ${filePath} (${attempt}/${MAX_RETRIES})`);
       const uploadRes = await Axios.request({
         method: 'post',
         url: 'https://api.tinify.com/shrink',
@@ -48,7 +55,6 @@ const postFileToRemote = async (filePath: string, data: Buffer): Promise<void> =
         timeout: TINIFY_REQUEST_TIMEOUT_MS,
       });
 
-      console.log(`[压缩] 下载 ${filePath} (${attempt}/${MAX_RETRIES})`);
       const fileRes = await Axios.request({
         method: 'get',
         url: uploadRes.data.output.url,
@@ -61,18 +67,17 @@ const postFileToRemote = async (filePath: string, data: Buffer): Promise<void> =
       const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
 
       writeToPath(filePath, new Uint8Array(fileRes.data));
-      console.log(`[压缩] ${filePath} (${(originalSize / 1024).toFixed(1)}kb -> ${(compressedSize / 1024).toFixed(1)}kb, -${ratio}%)`);
       return;
     } catch (err) {
       lastError = err;
       const classified = classifyError(err);
 
       if (!classified.retryable || attempt === MAX_RETRIES) {
-        throw new Error(`[${classified.type}] ${filePath}: ${classified.message}`);
+        throw new Error(`[${TINIFY_ERROR_TYPE_LABEL[classified.type]}] ${filePath}: ${classified.message}`);
       }
 
       const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
-      console.warn(`[压缩] ${filePath} 第${attempt}次失败 (${classified.type}), ${delay}ms 后重试...`);
+      console.warn(`[压缩] ${filePath} 第${attempt}次失败（${TINIFY_ERROR_TYPE_LABEL[classified.type]}），${delay}ms 后重试...`);
       await sleep(delay);
     }
   }
@@ -120,20 +125,13 @@ export const execTinify = async (): Promise<{ success: boolean; msg: string }> =
   const allImgFiles = getAllFilesFormDir(originPkgPath).filter(checkImgType);
 
   console.log(`[压缩] 扫描目录: ${originPkgPath}`);
-  console.log(`[压缩] 发现 ${allImgFiles.length} 个图片文件:`);
-  for (const f of allImgFiles) {
-    const baseName = path.basename(f, path.extname(f));
-    console.log(`[压缩]   文件名: ${baseName}  (${path.basename(f)})`);
-  }
+  console.log(`[压缩] 发现 ${allImgFiles.length} 个图片文件`);
 
   const skippedFiles = allImgFiles.filter(f => isUuidSkipped(f, tinifySkipUuids));
   const files = allImgFiles.filter(f => !isUuidSkipped(f, tinifySkipUuids));
 
   if (skippedFiles.length > 0) {
     console.log(`[压缩] 跳过 ${skippedFiles.length} 个 UUID 匹配的图片`);
-    for (const f of skippedFiles) {
-      console.log(`[压缩]   跳过: ${path.basename(f)}`);
-    }
   }
 
   if (files.length === 0) {
@@ -155,8 +153,8 @@ export const execTinify = async (): Promise<{ success: boolean; msg: string }> =
     }
     const succeeded = files.length - failed.length;
     return {
-      success: succeeded > 0,
-      msg: `压缩完成: ${succeeded}/${files.length} 成功, ${failed.length} 失败`,
+      success: false,
+      msg: `图片压缩部分失败：${succeeded}/${files.length} 成功，${failed.length} 失败`,
     };
   }
 
