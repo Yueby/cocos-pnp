@@ -3,3 +3,7 @@ dist/
 !packages/playable-adapter-core/dist/
 /.history
 .env
+.pi-lens/
+/.tmp-asar-builder
+.tmp-*.log
+progress.md

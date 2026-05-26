@@ -33,7 +33,7 @@ await execAdapter({
 
 ### `playable-ads-adapter`
 
-Cocos Creator 3.8.x+ 编辑器扩展。提供构建面板、构建 hooks、worker 执行隔离、`.adapterrc` 配置读写、日志转发，并调用 `playable-adapter-core` 生成试玩广告渠道包。
+Cocos Creator 3.8.x+ 编辑器扩展。提供构建面板、构建 hooks、外部 Node 子进程执行隔离、`.adapterrc` 配置读写、日志转发，并调用 `playable-adapter-core` 生成试玩广告渠道包。
 
 ## 支持渠道
 
@@ -65,7 +65,8 @@ Cocos Creator 3.8.x+ 编辑器扩展。提供构建面板、构建 hooks、worke
 - 自定义导出文件名和 HTML 标题。
 - 自定义 iOS / Android 跳转链接，并支持在注入脚本里替换 `<ios>` / `<android>`。
 - 动态渠道名占位符 `{{__adv_channels_adapter__}}`。
-- 可选 Tinypng 图片压缩。
+- 可选本地 sharp 图片压缩，默认质量 `60`。
+- 适配执行和 sharp 压缩均通过外部 Node 子进程运行，避免阻塞 Cocos Editor 进程。
 - 可选 Pako 资源压缩。
 - 运行时 `Playable` 工具类，用于渠道判断和常用广告生命周期调用。
 
@@ -75,13 +76,20 @@ Cocos Creator 3.8.x+ 编辑器扩展。提供构建面板、构建 hooks、worke
 
 [https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true](https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true)
 
-解压到 Cocos Creator 项目的扩展目录：
+请先按你的系统/架构选择对应 zip。当前打包脚本生成平台独立的 x64 包：
+
+- `playable-ads-adapter-v<version>-win32-x64.zip`
+- `playable-ads-adapter-v<version>-darwin-x64.zip`
+
+再解压到 Cocos Creator 项目的扩展目录：
 
 ```text
 <your-cocos-project>/extensions/playable-ads-adapter
 ```
 
-如果扩展没有立即出现，重启 Cocos Creator 项目。
+如果扩展没有立即出现，重启 Cocos Creator 项目。解压后无需额外执行 `npm install`。
+
+构建时需要本机可用的 Node.js，因为适配和 sharp 压缩都通过外部 Node 子进程执行。请确保 `node` 已加入 `PATH`，或设置 `NODE_BINARY` 指向 `node.exe` / `node` 的绝对路径。
 
 ## 使用插件
 
@@ -107,9 +115,12 @@ Cocos Creator 3.8.x+ 编辑器扩展。提供构建面板、构建 hooks、worke
   "exportChannels": ["Google", "Facebook"],
   "enableSplash": true,
   "isZip": true,
-  "tinify": false,
-  "tinifyApiKey": "",
-  "tinifySkipUuids": [],
+  "compress": {
+    "enable": false,
+    "quality": 60,
+    "skipUuids": [],
+    "concurrency": 8
+  },
   "injectOptions": {
     "Unity": {
       "body": "<script>var iosUrl='<ios>';var androidUrl='<android>';</script>",
@@ -133,7 +144,7 @@ Cocos Creator 3.8.x+ 编辑器扩展。提供构建面板、构建 hooks、worke
 | `exportChannels` | 指定导出渠道。为空或不填时导出全部渠道。 |
 | `enableSplash` | 是否处理启动图。 |
 | `isZip` | 是否启用 Pako 资源压缩。 |
-| `tinify` / `tinifyApiKey` / `tinifySkipUuids` | Tinypng 图片压缩配置。 |
+| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | 本地 sharp 图片压缩配置。`quality` 默认 `60`，试玩广告常用 `50-70`。 |
 | `injectOptions` | 按渠道注入 `head`、`body`、`sdkScript`。 |
 
 ## 运行时 `Playable` 工具类
@@ -223,8 +234,17 @@ pnpm run build
 # watch 构建扩展。设置 COCOS_EXTENSION_DEST 时会同步复制。
 pnpm run watch
 
-# 构建并生成 packages/playable-ads-adapter/dist/playable-ads-adapter.zip
+# 构建并生成当前平台对应的 zip 包
 pnpm run package
+
+# 构建 Windows x64 zip 包
+pnpm run package:win
+
+# 构建 macOS x64 zip 包
+pnpm run package:mac
+
+# 构建全部支持的 zip 包
+pnpm run package:all
 ```
 
 ## 发布
@@ -242,8 +262,12 @@ pnpm install --frozen-lockfile
 pnpm run package
 ```
 
+打包后的 zip 已包含扩展运行时代码、`adapter-runner.js`、`sharp-worker.js` 和对应平台的 sharp native 运行时。除非明确要替换依赖，否则不要在解压后的扩展目录里执行 `npm install`。
+
 ## 注意事项
 
 - Cocos 扩展 manifest 中的 `package_version: 2` 是 Cocos 扩展 schema 版本，不是 Creator 2.x 支持。
 - `.adapterrc` 文件名兼容仍保留，但推荐使用 `.adapterrc.json`。
 - `settings.js` fallback 仍保留，用于兼容不同 Cocos 构建产物形态。
+- 适配执行通过外部 Node 子进程中的 `adapter-runner.js` 完成；Cocos Editor 进程只负责构建状态、日志和取消控制。
+- 图片压缩使用随包带的 `sharp@0.33.5`，并通过外部 Node 子进程中的 `sharp-worker.js` 执行。

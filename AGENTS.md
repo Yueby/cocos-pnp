@@ -3,7 +3,7 @@
 本仓库是一个 pnpm monorepo，用于维护 Cocos Creator 3.x playable ads 多渠道导出适配插件，当前重点维护 Cocos Creator 3.8.x+。整体结构分为两层：
 
 - `packages/playable-adapter-core`：核心构建产物处理引擎，负责把 Cocos 3.x 构建结果转换为单文件 HTML 和各广告渠道包。
-- `packages/playable-ads-adapter`：Cocos Creator 3.x 编辑器扩展层，负责面板、hooks、builder、worker、配置读取，并调用 core 执行实际适配。
+- `packages/playable-ads-adapter`：Cocos Creator 3.x 编辑器扩展层，负责面板、hooks、builder、外部 Node 子进程适配、配置读取，并调用 core 执行实际适配。
 
 根目录主要负责 workspace 编排和文档说明，不承载具体业务实现。除非任务明确要求，优先在相关 package 内做最小范围修改。
 
@@ -34,6 +34,10 @@
 pnpm run build:core
 pnpm run build
 pnpm run watch
+pnpm run package
+pnpm run package:win
+pnpm run package:mac
+pnpm run package:all
 ```
 
 脚本关系：
@@ -41,6 +45,9 @@ pnpm run watch
 - `build:core`：构建 `playable-adapter-core`。
 - `build`：构建 core 和扩展产物。
 - `watch`：进入扩展层对应 watch 流程。
+- `package`：按当前平台生成扩展 zip，当前仅支持 `win32-x64` / `darwin-x64`。
+- `package:win` / `package:mac`：分别生成 Windows / macOS x64 包。
+- `package:all`：依次生成 Windows / macOS x64 包。
 
 ## Cocos 版本定位
 
@@ -60,7 +67,7 @@ pnpm run watch
 关键路径：
 
 - `src/index.ts`：公开入口，只导出类型和 `execAdapter`。
-- `src/executor.ts`：顶层编排，流程为挂载全局上下文 → Tinify → 单文件合并 → 渠道打包 → 卸载上下文。
+- `src/executor.ts`：顶层编排，流程为挂载全局上下文 → 图片压缩（sharp）→ 单文件合并 → 渠道打包 → 卸载上下文。
 - `src/global.ts`：通过 `global.__playable_ads_adapter_global__` 保存 `buildFolderPath` 和 `adapterBuildConfig`。
 - `src/merger/base.ts`：单文件 HTML 生成核心，处理 HTML、CSS、脚本、资源映射、settings、splash、title、资源压缩和运行时注入。
 - `src/merger/index.ts`：单文件生成薄封装。
@@ -69,7 +76,7 @@ pnpm run watch
 - `src/packager/base.ts`：按 `exportChannels` 调度渠道生成，支持 `parallel` / `serial`。
 - `src/packager/index.ts`：把 `TChannel` 映射到各渠道导出函数。
 - `src/channels/`：各广告渠道差异化实现。
-- `src/helpers/`：注入脚本、DOM 注入、Tinify、MRAID 等辅助逻辑。
+- `src/helpers/`：注入脚本、DOM 注入、图片压缩（sharp）、MRAID 等辅助逻辑。
 - `src/utils/`：文件系统、资源映射、路径、配置读取、复制等底层工具。
 - `src/typings/index.d.ts`：平台、渠道、配置、打包参数等核心类型约束。
 
@@ -80,7 +87,7 @@ execAdapter
   ↓
 mountGlobalVars(buildFolderPath, adapterBuildConfig)
   ↓
-execTinify()
+execCompress()
   ↓
 genSingleFile
   ↓
@@ -106,17 +113,18 @@ unmountGlobalVars()
 
 职责：Cocos Creator 编辑器侧适配层。
 
-该包负责把 Cocos 构建生命周期接到 `playable-adapter-core`，并提供扩展入口、builder hooks、面板、worker 执行隔离、配置管理、日志回传和运行时辅助脚本。
+该包负责把 Cocos 构建生命周期接到 `playable-adapter-core`，并提供扩展入口、builder hooks、面板、外部 Node 子进程执行隔离、配置管理、日志回传和运行时辅助脚本。
 
 关键路径：
 
 - `src/main.ts`：Cocos 扩展入口，通过 `configs` 注册 `hooks` 和 `panel`，通过 `methods` 暴露 `builder` 与 `updateLanguage`。
 - `src/hooks.ts`：构建生命周期入口，连接 `onBeforeBuild` / `onAfterBuild` 与 builder。
-- `src/extensions/builder/index.ts`：构建编排层，读取配置、处理 `skipBuild`、组装 core 参数、调用 worker 或主线程兜底执行。
-- `src/extensions/worker/index.ts`：通过 `worker_threads` 调用 core，并把 console 日志转发回主线程。
+- `src/extensions/builder/index.ts`：构建编排层，读取配置、处理 `skipBuild`、通过 Cocos 当前编辑器 `add-task` 执行构建，并用外部 Node 子进程运行适配。
+- `src/extensions/adapter-runner.ts`：外部 Node 子进程入口，调用 core 的 `execAdapter`，通过 JSON line 协议把日志和完成状态回传给 builder。
+- `src/extensions/worker/index.ts`：历史 worker 入口，当前发布/适配主流程不再依赖 `worker_threads`，优先保持外部 Node 子进程隔离。
 - `src/extensions/utils/file-system/adapterrc.ts`：读取 `.adapterrc.json` / `.adapterrc`，区分构建时读取和面板读取。
 - `src/panels/builder/config.ts`：面板模板、样式、字段 ID、渠道选项、方向选项等静态配置。
-- `src/panels/builder/panel.ts`：面板交互逻辑，负责配置读写、构建按钮、Tinify 校验、语言更新、构建状态遮罩等。
+- `src/panels/builder/panel.ts`：面板交互逻辑，负责配置读写、构建按钮、compress 配置交互、语言更新、构建状态遮罩等。
 - `assets/Playable.ts`：游戏运行时辅助工具，暴露 `window.playable` 和 `Playable`。
 - `@types/`：Cocos 编辑器和扩展包相关类型声明。
 
@@ -125,23 +133,25 @@ unmountGlobalVars()
 ```text
 panel.ts（用户交互 / 配置编辑）
   ↓
-builder/index.ts（组装参数 / 调度构建 / skipBuild）
+builder/index.ts（组装参数 / Cocos add-task / skipBuild / 状态与取消）
   ↓
-worker/index.ts（子线程执行 / 日志回传）
+adapter-runner.ts（外部 Node 子进程执行 / JSON line 日志回传）
   ↓
 playable-adapter-core.execAdapter(...)
+  ↓
+sharp-worker.js（图片压缩优先使用外部 Node 子进程）
 ```
 
 修改 extension 时的注意事项：
 
-- 保持 builder / worker / panel / config 的职责边界：builder 编排，worker 执行隔离，panel 负责 UI，config 负责静态模板和常量。
+- 保持 builder / adapter-runner / panel / config 的职责边界：builder 编排与状态控制，adapter-runner 执行 core 适配隔离，panel 负责 UI，config 负责静态模板和常量。
 - 修改 `main.ts` 时，保护 `configs.hooks`、`configs.panel`、`methods.updateLanguage` 这些关键注册点。
 - `readAdapterRCFile()` 会替换 `<ios>` / `<android>` 占位符；`readAdapterRCFileForPanel()` 应保留原始值供面板显示。
 - 面板字段变更通常要同步 `config.ts`、`panel.ts` 和配置读写逻辑。
-- worker 中的 console 重写用于日志回传，修改时不要破坏 `parentPort.postMessage` 链路。
+- `adapter-runner.ts` 通过 stdout JSON line 回传日志和完成状态，修改时不要破坏 `adapter:<level>` / `adapter:finished` 消息协议。
 - 调用 core 的参数形状应保持为 `buildFolderPath` + `adapterBuildConfig`，并由 builder 补充 `buildPlatform` / `orientation`。
-- 构建流程中要保证 `buildState.notify(true/false)` 不会因异常路径导致面板 loading 卡死。
-- `rollup.config.js` 固定 Cocos Creator 3.8.x+ 入口；修改入口、alias、worker 或 panel 路径时必须同步检查构建配置。
+- 构建流程中要保证 `buildState.notify(true/false)` 不会因异常路径导致面板 loading 卡死；取消按钮应同时能中断 Cocos 临时构建任务和适配子进程。
+- `rollup.config.js` 固定 Cocos Creator 3.8.x+ 入口；修改入口、alias、adapter-runner、sharp-worker 或 panel 路径时必须同步检查构建配置。
 - `assets/Playable.ts` 是运行时脚本，不要混入编辑器侧逻辑。
 
 ## 支持渠道
@@ -193,7 +203,7 @@ packages/playable-adapter-core/src/channels/<channel>/
 | `exportChannels` | 指定导出渠道；为空或不填时默认导出全部渠道 |
 | `enableSplash` | 是否启用启动图处理 |
 | `injectOptions` | 按渠道注入 `head`、`body`、`sdkScript` |
-| `tinify` / `tinifyApiKey` / `tinifySkipUuids` | Tinypng 图片压缩相关配置 |
+| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | 本地 sharp 图片压缩相关配置；`quality` 默认 60，常用 50-70 |
 | `isZip` | 是否启用 Pako 资源压缩 |
 
 配置相关改动要同时考虑：
@@ -210,7 +220,7 @@ packages/playable-adapter-core/src/channels/<channel>/
 - 动态渠道名占位符 `{{__adv_channels_adapter__}}`。
 - 新增 Bigo、SnapChat、Yandex 渠道支持。
 - 优化 MRAID SDK 集成和平台生命周期管理。
-- Tinypng 图片压缩与 Pako 资源压缩。
+- 本地 sharp 图片压缩与 Pako 资源压缩；图片压缩默认质量为 60，优先通过外部 Node 子进程执行。
 - 全局 `Playable` 工具类，用于渠道判断、语言读取、SDK ready、广告展示、游戏结束、重玩和暂停逻辑。
 
 ## 开发原则
@@ -220,4 +230,4 @@ packages/playable-adapter-core/src/channels/<channel>/
 - 除非任务明确要求，不要跨 package 同时改动 core 和 extension。
 - 涉及面板 UI 的改动应优先检查当前 Cocos Creator 3.8.x+ 扩展入口。
 - 涉及渠道集合的改动必须同步类型、聚合导出和 packager 映射。
-- 涉及构建输出、压缩、HTML 注入、渠道导出的改动，应运行相关 build 或至少说明未验证的原因。
+- 涉及构建输出、压缩、HTML 注入、渠道导出的改动，应运行相关 build/package 或至少说明未验证的原因；用户需要 zip 时优先运行 `pnpm run package`。

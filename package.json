@@ -9,7 +9,10 @@
     "build:core": "pnpm -F playable-adapter-core build",
     "build": "pnpm -F playable-ads-adapter build",
     "watch": "pnpm -F playable-ads-adapter watch",
-    "package": "node scripts/package-playable.js"
+    "package": "node scripts/package-playable.js",
+    "package:win": "node scripts/package-playable.js --platform=win32",
+    "package:mac": "node scripts/package-playable.js --platform=darwin",
+    "package:all": "pnpm run package:win && pnpm run package:mac"
   },
   "repository": {
     "type": "git",

@@ -35,7 +35,7 @@ await execAdapter({
 
 ### `playable-ads-adapter`
 
-Cocos Creator 3.8.x+ editor extension. It provides the builder panel, build hooks, worker execution, `.adapterrc` reading/writing, logging, and calls `playable-adapter-core` to generate playable ad packages.
+Cocos Creator 3.8.x+ editor extension. It provides the builder panel, build hooks, external Node process execution, `.adapterrc` reading/writing, logging, and calls `playable-adapter-core` to generate playable ad packages.
 
 ## Supported Channels
 
@@ -67,7 +67,8 @@ Cocos Creator 3.8.x+ editor extension. It provides the builder panel, build hook
 - Custom exported file name and HTML title.
 - Custom iOS / Android URLs with `<ios>` / `<android>` replacement in injected scripts.
 - Dynamic channel placeholder replacement with `{{__adv_channels_adapter__}}`.
-- Optional Tinypng image compression.
+- Optional local sharp image compression, default quality `60`.
+- Adapter execution and sharp compression run in external Node processes to avoid blocking the Cocos Editor process.
 - Optional Pako resource compression.
 - Runtime `Playable` utility class for channel checks and common ad lifecycle calls.
 
@@ -77,13 +78,20 @@ Download the packaged extension from releases:
 
 [https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true](https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true)
 
+Choose the zip that matches your host platform. Current package scripts generate platform-specific x64 packages:
+
+- `playable-ads-adapter-v<version>-win32-x64.zip`
+- `playable-ads-adapter-v<version>-darwin-x64.zip`
+
 Then extract it into your Cocos Creator project extension directory:
 
 ```text
 <your-cocos-project>/extensions/playable-ads-adapter
 ```
 
-Restart the Cocos Creator project if the extension does not appear immediately.
+Restart the Cocos Creator project if the extension does not appear immediately. No extra `npm install` is required.
+
+A local Node.js runtime is required at build time because the adapter and sharp compressor run in external Node processes. Ensure `node` is available in `PATH`, or set `NODE_BINARY` to the absolute path of `node.exe` / `node`.
 
 ## Using the Extension
 
@@ -109,9 +117,12 @@ The panel reads and writes `.adapterrc.json` in the Cocos project root. Legacy `
   "exportChannels": ["Google", "Facebook"],
   "enableSplash": true,
   "isZip": true,
-  "tinify": false,
-  "tinifyApiKey": "",
-  "tinifySkipUuids": [],
+  "compress": {
+    "enable": false,
+    "quality": 60,
+    "skipUuids": [],
+    "concurrency": 8
+  },
   "injectOptions": {
     "Unity": {
       "body": "<script>var iosUrl='<ios>';var androidUrl='<android>';</script>",
@@ -135,7 +146,7 @@ Important fields:
 | `exportChannels` | Channels to export. Empty or omitted means all channels. |
 | `enableSplash` | Whether to process the splash screen. |
 | `isZip` | Whether to use Pako resource compression. |
-| `tinify` / `tinifyApiKey` / `tinifySkipUuids` | Tinypng compression options. |
+| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | Local sharp compression options. `quality` defaults to `60`; `50-70` is usually a good playable-ad range. |
 | `injectOptions` | Channel-specific script injection for `head`, `body`, and `sdkScript`. |
 
 ## Runtime `Playable` Utility
@@ -225,8 +236,17 @@ pnpm run build
 # Watch extension build. Also uses COCOS_EXTENSION_DEST when set.
 pnpm run watch
 
-# Build and create packages/playable-ads-adapter/dist/playable-ads-adapter.zip
+# Build and create current-platform release zip
 pnpm run package
+
+# Build Windows x64 release zip
+pnpm run package:win
+
+# Build macOS x64 release zip
+pnpm run package:mac
+
+# Build all supported release zips
+pnpm run package:all
 ```
 
 ## Release
@@ -244,8 +264,12 @@ pnpm install --frozen-lockfile
 pnpm run package
 ```
 
+Packaged zips include the extension runtime, `adapter-runner.js`, `sharp-worker.js`, and the platform-specific sharp native runtime. Do not run `npm install` inside an extracted extension unless you intentionally want to replace bundled dependencies.
+
 ## Notes
 
 - `package_version: 2` in the Cocos extension manifest is the Cocos extension schema version, not Creator 2.x support.
 - `.adapterrc` compatibility is retained for existing projects, but `.adapterrc.json` is the preferred config file.
 - `settings.js` fallback is retained for Cocos build-output compatibility.
+- Adapter execution uses `adapter-runner.js` in an external Node process; the Cocos Editor process only orchestrates build state, logging, and cancellation.
+- Image compression uses bundled `sharp@0.33.5` and runs through `sharp-worker.js` in an external Node process.

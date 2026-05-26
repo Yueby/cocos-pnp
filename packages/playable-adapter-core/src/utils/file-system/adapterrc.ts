@@ -1,21 +1,25 @@
-import path from 'path';
-import { TAdapterRC, TChannel, TChannelRC } from '@/typings';
-import { getGlobalBuildConfig, getGlobalProjectBuildPath } from '@/global';
+import path from "path";
+import type { TAdapterRC, TChannel, TChannelRC } from "@/typings";
+import { getGlobalBuildConfig, getGlobalProjectBuildPath } from "@/global";
 
 export const getAdapterRCJson = (): TAdapterRC | null => {
 	return getGlobalBuildConfig();
 };
 
 export const getOriginPkgPath = () => {
-	let configJson: Partial<TAdapterRC> = getAdapterRCJson() || {};
-	const buildPlatform = configJson.buildPlatform || 'web-mobile';
+	const configJson: Partial<TAdapterRC> = getAdapterRCJson() || {};
+	const buildPlatform = configJson.buildPlatform || "web-mobile";
 
 	return path.join(getGlobalProjectBuildPath(), buildPlatform!);
 };
 
 export const getChannelRCJson = (channel: TChannel): TChannelRC | null => {
 	const adapterRCJson = getAdapterRCJson();
-	if (!adapterRCJson || !adapterRCJson.injectOptions || !adapterRCJson.injectOptions[channel]) {
+	if (
+		!adapterRCJson ||
+		!adapterRCJson.injectOptions ||
+		!adapterRCJson.injectOptions[channel]
+	) {
 		return null;
 	}
 
@@ -31,25 +35,35 @@ export const getRCSkipBuild = (): boolean => {
 	return adapterRCJson.skipBuild ?? false;
 };
 
-export const getRCTinify = (): { tinify: boolean; tinifyApiKey: string; tinifySkipUuids: string[] } => {
+export const getRCCompress = (): {
+	enable: boolean;
+	quality: number;
+	skipUuids: string[];
+	concurrency: number;
+} => {
 	const adapterRCJson = getAdapterRCJson();
 	if (!adapterRCJson) {
 		return {
-			tinify: false,
-			tinifyApiKey: '',
-			tinifySkipUuids: []
+			enable: false,
+			quality: 60,
+			skipUuids: [],
+			concurrency: require("os").cpus().length,
 		};
 	}
 
 	return {
-		tinify: !!adapterRCJson.tinify,
-		tinifyApiKey: adapterRCJson.tinifyApiKey || '',
-		tinifySkipUuids: adapterRCJson.tinifySkipUuids || []
+		enable: !!adapterRCJson?.compress?.enable,
+		quality: adapterRCJson?.compress?.quality ?? 60,
+		skipUuids: adapterRCJson?.compress?.skipUuids ?? [],
+		concurrency:
+			adapterRCJson?.compress?.concurrency ?? require("os").cpus().length,
 	};
 };
 
 export const getChannelRCSdkScript = (channel: TChannel): string => {
 	const channelRCJson = getChannelRCJson(channel);
 
-	return !channelRCJson || !channelRCJson.sdkScript ? '' : channelRCJson.sdkScript;
+	return !channelRCJson || !channelRCJson.sdkScript
+		? ""
+		: channelRCJson.sdkScript;
 };

@@ -1,11 +1,11 @@
-import { ADAPTER_RC_PATH } from '@/extensions/constants';
-import { logger } from '@/extensions/logger';
-import { existsSync } from 'fs';
-import { join } from 'path';
-import { readToPath } from './base';
+import { ADAPTER_RC_PATH } from "@/extensions/constants";
+import { logger } from "@/extensions/logger";
+import { existsSync } from "fs";
+import { join } from "path";
+import { readToPath } from "./base";
 
-const iosTag: string = '<ios>';
-const androidTag: string = '<android>';
+const iosTag: string = "<ios>";
+const androidTag: string = "<android>";
 
 // 基础读取配置文件的函数
 export const readAdapterRCFileBase = (): TAdapterRC | null => {
@@ -13,23 +13,23 @@ export const readAdapterRCFileBase = (): TAdapterRC | null => {
 		const projectRootPath = Editor.Project.path;
 		const adapterRCJsonPath = `${projectRootPath}${ADAPTER_RC_PATH}`;
 		const legacyAdapterRCPath = `${projectRootPath}/.adapterrc`;
-		
-		let configPath = '';
+
+		let configPath = "";
 		if (existsSync(adapterRCJsonPath)) {
 			configPath = adapterRCJsonPath;
 		} else if (existsSync(legacyAdapterRCPath)) {
 			configPath = legacyAdapterRCPath;
 		}
-		
+
 		if (!configPath) return null;
-		
+
 		const fileContent = readToPath(configPath);
 		if (!fileContent) return null;
-		
-		let config = <TAdapterRC>JSON.parse(fileContent);
+
+		const config = <TAdapterRC>JSON.parse(fileContent);
 		return config;
 	} catch (error) {
-		logger.error('读取配置文件失败:', error);
+		logger.error("读取配置文件失败:", error);
 		return null;
 	}
 };
@@ -42,11 +42,14 @@ export const readAdapterRCFile = (): TAdapterRC | null => {
 	// 处理注入选项
 	if (config.injectOptions) {
 		for (const channel in config.injectOptions) {
-			if (config.injectOptions.hasOwnProperty(channel)) {
+			if (Object.hasOwn(config.injectOptions, channel)) {
 				const typedChannel = channel as keyof typeof config.injectOptions;
 				const channelConfig = config.injectOptions[typedChannel];
 				if (channelConfig && channelConfig.body) {
-					config.injectOptions[typedChannel].body = modifyBody(channelConfig.body, config);
+					config.injectOptions[typedChannel].body = modifyBody(
+						channelConfig.body,
+						config,
+					);
 				}
 			}
 		}
@@ -60,23 +63,24 @@ export const readAdapterRCFileForPanel = (): TAdapterRC | null => {
 };
 
 export const modifyBody = (body: string, config: TAdapterRC): string => {
-	if (!body) return '';
-	const { iosUrl = '', androidUrl = '' } = config || {};
+	if (!body) return "";
+	const { iosUrl = "", androidUrl = "" } = config || {};
 	return body.replaceAll(iosTag, iosUrl).replaceAll(androidTag, androidUrl);
 };
 
 export const getAdapterConfig = () => {
 	const projectRootPath = Editor.Project.path;
-	const projectBuildPath = '/build';
+	const projectBuildPath = "/build";
 	const adapterBuildConfig = readAdapterRCFile();
-	let buildPlatform: TPlatform = adapterBuildConfig?.buildPlatform ?? 'web-mobile';
+	const buildPlatform: TPlatform =
+		adapterBuildConfig?.buildPlatform ?? "web-mobile";
 
 	return {
 		projectRootPath,
 		projectBuildPath,
 		buildPlatform,
 		originPkgPath: join(projectRootPath, projectBuildPath, buildPlatform),
-		adapterBuildConfig
+		adapterBuildConfig,
 	};
 };
 
@@ -86,7 +90,11 @@ export const getAdapterRCJson = (): TAdapterRC | null => {
 
 export const getChannelRCJson = (channel: TChannel): TChannelRC | null => {
 	const adapterRCJson = getAdapterRCJson();
-	if (!adapterRCJson || !adapterRCJson.injectOptions || !adapterRCJson.injectOptions[channel]) {
+	if (
+		!adapterRCJson ||
+		!adapterRCJson.injectOptions ||
+		!adapterRCJson.injectOptions[channel]
+	) {
 		return null;
 	}
 
@@ -102,24 +110,34 @@ export const getRCSkipBuild = (): boolean => {
 	return adapterRCJson.skipBuild ?? false;
 };
 
-export const getRCTinify = (): { tinify: boolean; tinifyApiKey: string; tinifySkipUuids: string[] } => {
+export const getRCCompress = (): {
+	enable: boolean;
+	quality: number;
+	skipUuids: string[];
+	concurrency: number;
+} => {
 	const adapterRCJson = getAdapterRCJson();
 	if (!adapterRCJson) {
 		return {
-			tinify: false,
-			tinifyApiKey: '',
-			tinifySkipUuids: []
+			enable: false,
+			quality: 60,
+			skipUuids: [],
+			concurrency: require("os").cpus().length,
 		};
 	}
 
 	return {
-		tinify: !!adapterRCJson.tinify,
-		tinifyApiKey: adapterRCJson.tinifyApiKey || '',
-		tinifySkipUuids: adapterRCJson.tinifySkipUuids || []
+		enable: !!adapterRCJson?.compress?.enable,
+		quality: adapterRCJson?.compress?.quality ?? 60,
+		skipUuids: adapterRCJson?.compress?.skipUuids ?? [],
+		concurrency:
+			adapterRCJson?.compress?.concurrency ?? require("os").cpus().length,
 	};
 };
 
 export const getChannelRCSdkScript = (channel: TChannel): string => {
 	const channelRCJson = getChannelRCJson(channel);
-	return !channelRCJson || !channelRCJson.sdkScript ? '' : channelRCJson.sdkScript;
+	return !channelRCJson || !channelRCJson.sdkScript
+		? ""
+		: channelRCJson.sdkScript;
 };

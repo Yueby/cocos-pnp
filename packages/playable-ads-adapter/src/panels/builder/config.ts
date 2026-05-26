@@ -1,83 +1,103 @@
-import { TAdapterRCKeysExcluded, TPanelSelector } from './types';
+import type { TAdapterRCKeysExcluded, TPanelSelector } from "./types";
 
-export const CHANNEL_OPTIONS: TChannel[] = ['AppLovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'Mintegral', 'Moloco', 'Pangle', 'Rubeex', 'Tiktok', 'Unity', 'SnapChat', 'Yandex', 'Bigo'];
-export const ORIENTATIONS: TWebOrientations[] = ['auto', 'portrait', 'landscape'];
+export const CHANNEL_OPTIONS: TChannel[] = [
+	"AppLovin",
+	"Facebook",
+	"Google",
+	"IronSource",
+	"Liftoff",
+	"Mintegral",
+	"Moloco",
+	"Pangle",
+	"Rubeex",
+	"Tiktok",
+	"Unity",
+	"SnapChat",
+	"Yandex",
+	"Bigo",
+];
+export const ORIENTATIONS: TWebOrientations[] = [
+	"auto",
+	"portrait",
+	"landscape",
+];
 
-export type TTipLevel = 'info' | 'warn' | 'error';
+export type TTipLevel = "info" | "warn" | "error";
 
 export type TChannelTip = {
-    message: string;
-    link?: string;
-    linkText?: string;
-    level?: TTipLevel;
+	message: string;
+	link?: string;
+	linkText?: string;
+	level?: TTipLevel;
 };
 
 export const DEFAULT_TIP: TChannelTip = {
-    message: '需要将构建发布面板中的"原生代码打包模式"改成AmsJS或者将物理引擎改成其他的，Bullet和Wasm就会引发如"i.xxx is not a function"的错误',
-    link: 'https://github.com/ppgee/cocos-pnp/issues/33',
-    linkText: '查看',
-    level: 'info'
+	message:
+		'需要将构建发布面板中的"原生代码打包模式"改成AmsJS或者将物理引擎改成其他的，Bullet和Wasm就会引发如"i.xxx is not a function"的错误',
+	link: "https://github.com/ppgee/cocos-pnp/issues/33",
+	linkText: "查看",
+	level: "info",
 };
 
 export const CHANNEL_TIPS: Partial<Record<TChannel, TChannelTip>> = {
-    Bigo: {
-        message: '需要在结束页面出现时调用 <b>Playable.tryGameEnd()</b> 函数来通知平台游戏已结束',
-        level: 'warn'
-    },
-    Mintegral: {
-        message: '结束页面出现时需调用 <b>Playable.tryGameEnd()</b> 通知平台游戏已结束；若存在重玩场景，还需在重玩时调用 <b>Playable.tryGameRetry()</b>',
-        link: 'https://www.playturbo.cn/review/doc',
-        linkText: '查看详情',
-        level: 'warn'
-    },
-    Yandex: {
-        message: '要求最大存档大小为 <b>3 MB</b>，请确保构建产物压缩后不超过此限制',
-        link: 'https://yandex.ru/support/direct/zh/products-mobile-apps-ads/recommendations',
-        linkText: '查看详情',
-        level: 'warn'
-    }
+	Bigo: {
+		message:
+			"需要在结束页面出现时调用 <b>Playable.tryGameEnd()</b> 函数来通知平台游戏已结束",
+		level: "warn",
+	},
+	Mintegral: {
+		message:
+			"结束页面出现时需调用 <b>Playable.tryGameEnd()</b> 通知平台游戏已结束；若存在重玩场景，还需在重玩时调用 <b>Playable.tryGameRetry()</b>",
+		link: "https://www.playturbo.cn/review/doc",
+		linkText: "查看详情",
+		level: "warn",
+	},
+	Yandex: {
+		message: "要求最大存档大小为 <b>3 MB</b>，请确保构建产物压缩后不超过此限制",
+		link: "https://yandex.ru/support/direct/zh/products-mobile-apps-ads/recommendations",
+		linkText: "查看详情",
+		level: "warn",
+	},
 };
 
 // 配置常量
 export const CONFIG = {
-    DEFAULT_BUILD_PLATFORM: 'web-mobile',
-    DEFAULT_ORIENTATION: 'auto',
-    INJECT_FIELDS: ['head', 'body', 'sdkScript'] as const
+	DEFAULT_BUILD_PLATFORM: "web-mobile",
+	DEFAULT_ORIENTATION: "auto",
+	INJECT_FIELDS: ["head", "body", "sdkScript"] as const,
 } as const;
 
 export const IDS = {
-    CONFIG_BUTTONS: 'configButtons',
-    CREATE_BUTTONS: 'createButtons',
-    NO_CONFIG_TIP: 'noConfigTip',
-    CONFIG_PANEL: 'configPanel',
-    OPEN_BUILD_FOLDER: 'openBuildFolder',
-    OPEN_CONFIG: 'openConfig',
-    IMPORT_CONFIG: 'importConfig',
-    EXPORT_CONFIG: 'exportConfig',
-    IMPORT_CONFIG_CREATE: 'importConfigCreate',
-    CREATE_CONFIG: 'createConfig',
-    BUILD: 'build',
-    BUILDING_MASK: 'buildingMask',
-    STORE_CONTAINER: 'storeContainer',
-    VALIDATE_KEY: 'validateKey',
-    COMPRESSION_COUNT: 'compressionCount',
-    COMPRESSION_PROGRESS: 'compressionProgress',
-    COMPRESSION_MAX: 'compressionMax',
-    TINIFY_KEY_ROW: 'tinifyKeyRow',
-    TINIFY_VALIDATE_ROW: 'tinifyValidateRow',
-    TINIFY_SKIP_UUIDS_ROW: 'tinifySkipUuidsRow',
-    KEY_POOL_ENABLE: 'keyPoolEnable',
-    KEY_POOL_ROW: 'keyPoolRow',
-    KEY_POOL_URL: 'keyPoolUrl',
-    KEY_POOL_TOKEN: 'keyPoolToken',
-    KEY_POOL_PICK: 'keyPoolPick'
+	CONFIG_BUTTONS: "configButtons",
+	CREATE_BUTTONS: "createButtons",
+	NO_CONFIG_TIP: "noConfigTip",
+	CONFIG_PANEL: "configPanel",
+	OPEN_BUILD_FOLDER: "openBuildFolder",
+	OPEN_CONFIG: "openConfig",
+	IMPORT_CONFIG: "importConfig",
+	EXPORT_CONFIG: "exportConfig",
+	IMPORT_CONFIG_CREATE: "importConfigCreate",
+	CREATE_CONFIG: "createConfig",
+	BUILD: "build",
+	BUILDING_MASK: "buildingMask",
+	CANCEL_BUILD: "cancelBuild",
+	STORE_CONTAINER: "storeContainer",
+	COMPRESS_ENABLE: "compressEnable",
+	COMPRESS_SUBSECTION: "compressSubsection",
+	COMPRESS_QUALITY: "compressQuality",
+	COMPRESS_SKIP_ROW: "compressSkipRow",
+	COMPRESS_SKIP_LIST: "compressSkipList",
+	COMPRESS_SKIP_ADD: "compressSkipAdd",
+	COMPRESS_QUALITY_ROW: "compressQualityRow",
+	COMPRESS_CONCURRENCY: "compressConcurrency",
+	COMPRESS_CONCURRENCY_ROW: "compressConcurrencyRow",
 } as const;
 
 // 事件类型
 export const EVENT_TYPES = {
-    CLICK: 'click',
-    CHANGE: 'change',
-    CONFIRM: 'confirm'
+	CLICK: "click",
+	CHANGE: "change",
+	CONFIRM: "confirm",
 } as const;
 
 export const STYLE = `
@@ -124,24 +144,10 @@ export const STYLE = `
     font-size: 14px;
 }
 
-.tinify-progress-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 0;
+.loading-cancel {
+    margin-top: 12px;
 }
-.tinify-progress-row ui-progress {
-    flex: 1;
-}
-.tinify-count-label {
-    white-space: nowrap;
-    font-size: 11px;
-    flex-shrink: 0;
-}
-.tinify-max-input {
-    width: 64px;
-    flex-shrink: 0;
-}
+
 .skip-uuid-list {
     padding: 4px 0 4px 8px;
 }
@@ -187,6 +193,7 @@ export const TEMPLATE = `
         <div class="loading-content">
             <ui-loading></ui-loading>
             <div class="loading-text">构建中...</div>
+            <ui-button class="loading-cancel" id="${IDS.CANCEL_BUILD}">停止构建</ui-button>
         </div>
     </div>
     <div id="${IDS.CONFIG_BUTTONS}" style="text-align: right; margin-bottom: 12px; display: none;">
@@ -234,7 +241,7 @@ export const TEMPLATE = `
         <ui-prop>
             <ui-label slot="label" value="屏幕方向"></ui-label>
             <ui-select slot="content" id="orientation" value="auto">
-                ${ORIENTATIONS.map((o) => `<option value="${o}">${o}</option>`).join('')}
+                ${ORIENTATIONS.map((o) => `<option value="${o}">${o}</option>`).join("")}
             </ui-select>
         </ui-prop>
         <ui-prop>
@@ -251,58 +258,42 @@ export const TEMPLATE = `
         </ui-prop>
         <ui-prop>
             <ui-label slot="label" value="启用图片压缩"></ui-label>
-            <ui-checkbox slot="content" id="tinify"></ui-checkbox>
+            <ui-checkbox slot="content" id="${IDS.COMPRESS_ENABLE}"></ui-checkbox>
         </ui-prop>
-        <div id="${IDS.TINIFY_SKIP_UUIDS_ROW}">
-            <ui-prop>
-                <ui-label slot="label" value="跳过压缩资源" tooltip="拖入不需要压缩的图片资源，压缩时将跳过这些资源"></ui-label>
-                <ui-button slot="content" id="tinifySkipUuidsAdd" class="small" tooltip="添加跳过项">+</ui-button>
+        <div id="${IDS.COMPRESS_SUBSECTION}">
+            <ui-prop id="${IDS.COMPRESS_QUALITY_ROW}">
+                <ui-label slot="label" value="压缩质量" tooltip="1-100，越低体积越小；推荐 60，常用 50-70"></ui-label>
+                <ui-slider slot="content" id="${IDS.COMPRESS_QUALITY}" value="60" min="1" max="100" step="1"></ui-slider>
             </ui-prop>
-            <div id="tinifySkipUuidsList" class="skip-uuid-list"></div>
-        </div>
-        <ui-prop id="${IDS.TINIFY_KEY_ROW}">
-            <ui-label slot="label" value="压缩API Key"></ui-label>
-            <ui-input slot="content" id="tinifyApiKey"></ui-input>
-            <ui-button slot="content" id="${IDS.VALIDATE_KEY}">验证</ui-button>
-        </ui-prop>
-        <div id="${IDS.TINIFY_VALIDATE_ROW}" class="tinify-progress-row">
-            <ui-progress id="${IDS.COMPRESSION_PROGRESS}" value="0" percent></ui-progress>
-            <ui-label id="${IDS.COMPRESSION_COUNT}" value="已使用 0 /" class="tinify-count-label"></ui-label>
-            <ui-num-input id="${IDS.COMPRESSION_MAX}" value="500" min="1" step="1" preci="0" class="tinify-max-input"></ui-num-input>
-            <ui-label value="次" class="tinify-count-label"></ui-label>
-        </div>
-        <ui-prop>
-            <ui-label slot="label" value="启用号池服务"></ui-label>
-            <ui-checkbox slot="content" id="${IDS.KEY_POOL_ENABLE}"></ui-checkbox>
-        </ui-prop>
-        <div id="${IDS.KEY_POOL_ROW}">
-            <ui-prop>
-                <ui-label slot="label" value="号池地址"></ui-label>
-                <ui-input slot="content" id="${IDS.KEY_POOL_URL}" placeholder="https://tinypool.example.dev"></ui-input>
+            <ui-prop id="${IDS.COMPRESS_CONCURRENCY_ROW}">
+                <ui-label slot="label" value="压缩并发数" tooltip="留空使用 CPU 核心数"></ui-label>
+                <ui-input slot="content" id="${IDS.COMPRESS_CONCURRENCY}" placeholder="自动"></ui-input>
             </ui-prop>
-            <ui-prop>
-                <ui-label slot="label" value="API Token"></ui-label>
-                <ui-input slot="content" id="${IDS.KEY_POOL_TOKEN}" type="password" placeholder="API Token"></ui-input>
-                <ui-button slot="content" id="${IDS.KEY_POOL_PICK}">获取Key</ui-button>
-            </ui-prop>
+            <div id="${IDS.COMPRESS_SKIP_ROW}">
+                <ui-prop>
+                    <ui-label slot="label" value="跳过压缩资源" tooltip="拖入不需要压缩的图片资源"></ui-label>
+                    <ui-button slot="content" id="${IDS.COMPRESS_SKIP_ADD}" class="small" tooltip="添加跳过项">+</ui-button>
+                </ui-prop>
+                <div id="${IDS.COMPRESS_SKIP_LIST}" class="skip-uuid-list"></div>
+            </div>
         </div>
 
         <div class="section-header">导出渠道配置</div>
         <div id="defaultTipContainer"></div>
         <div id="channelContainer" class="channel-list">
             ${CHANNEL_OPTIONS.map(
-    (channel) => `
+							(channel) => `
                 <ui-button id="${channel}" class="small" type="default">${channel}</ui-button>
-            `
-).join('')}
+            `,
+						).join("")}
         </div>
         <div id="channelTipsContainer"></div>
 
         <div class="section-header">注入选项配置</div>
-        
+
         <div id="injectOptionsContainer">
             ${CHANNEL_OPTIONS.map(
-    (channel) => `
+							(channel) => `
                 <ui-section id="${channel}-section" header="${channel} 配置" style="display: none;">
                     <ui-prop>
                         <ui-label slot="label" value="head"></ui-label>
@@ -317,8 +308,8 @@ export const TEMPLATE = `
                         <ui-textarea slot="content" id="${channel}-sdkScript" placeholder="输入 SDK 脚本注入内容"></ui-textarea>
                     </ui-prop>
                 </ui-section>
-            `
-).join('')}
+            `,
+						).join("")}
         </div>
         <ui-prop>
             <ui-label slot="label" value="HTML标题"></ui-label>
@@ -329,64 +320,57 @@ export const TEMPLATE = `
 `;
 
 export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
-    root: '#adapter-panel',
-    // 基本配置选择器
-    fileName: '#fileName',
-    title: '#title',
-    iosUrl: '#iosUrl',
-    androidUrl: '#androidUrl',
-    buildPlatform: '#buildPlatform',
-    orientation: '#orientation',
-    tinify: '#tinify',
-    tinifyApiKey: '#tinifyApiKey',
-    tinifySkipUuidsAdd: '#tinifySkipUuidsAdd',
-    tinifySkipUuidsList: '#tinifySkipUuidsList',
-    enableSplash: '#enableSplash',
-    skipBuild: '#skipBuild',
-    isZip: '#isZip',
-    lang: '#lang',
-    storePath: '#storePath',
+	root: "#adapter-panel",
+	// 基本配置选择器
+	fileName: "#fileName",
+	title: "#title",
+	iosUrl: "#iosUrl",
+	androidUrl: "#androidUrl",
+	buildPlatform: "#buildPlatform",
+	orientation: "#orientation",
+	enableSplash: "#enableSplash",
+	skipBuild: "#skipBuild",
+	isZip: "#isZip",
+	lang: "#lang",
+	storePath: "#storePath",
 
-    // DOM_IDS 中的选择器
-    [IDS.CONFIG_BUTTONS]: `#${IDS.CONFIG_BUTTONS}`,
-    [IDS.CREATE_BUTTONS]: `#${IDS.CREATE_BUTTONS}`,
-    [IDS.NO_CONFIG_TIP]: `#${IDS.NO_CONFIG_TIP}`,
-    [IDS.CONFIG_PANEL]: `#${IDS.CONFIG_PANEL}`,
-    [IDS.OPEN_BUILD_FOLDER]: `#${IDS.OPEN_BUILD_FOLDER}`,
-    [IDS.OPEN_CONFIG]: `#${IDS.OPEN_CONFIG}`,
-    [IDS.IMPORT_CONFIG]: `#${IDS.IMPORT_CONFIG}`,
-    [IDS.EXPORT_CONFIG]: `#${IDS.EXPORT_CONFIG}`,
-    [IDS.IMPORT_CONFIG_CREATE]: `#${IDS.IMPORT_CONFIG_CREATE}`,
-    [IDS.CREATE_CONFIG]: `#${IDS.CREATE_CONFIG}`,
-    [IDS.BUILD]: `#${IDS.BUILD}`,
-    [IDS.BUILDING_MASK]: `#${IDS.BUILDING_MASK}`,
-    [IDS.STORE_CONTAINER]: `#${IDS.STORE_CONTAINER}`,
-    [IDS.TINIFY_KEY_ROW]: `#${IDS.TINIFY_KEY_ROW}`,
-    [IDS.VALIDATE_KEY]: `#${IDS.VALIDATE_KEY}`,
-    [IDS.COMPRESSION_COUNT]: `#${IDS.COMPRESSION_COUNT}`,
-    [IDS.COMPRESSION_PROGRESS]: `#${IDS.COMPRESSION_PROGRESS}`,
-    [IDS.COMPRESSION_MAX]: `#${IDS.COMPRESSION_MAX}`,
-    [IDS.TINIFY_VALIDATE_ROW]: `#${IDS.TINIFY_VALIDATE_ROW}`,
-    [IDS.TINIFY_SKIP_UUIDS_ROW]: `#${IDS.TINIFY_SKIP_UUIDS_ROW}`,
-    [IDS.KEY_POOL_ENABLE]: `#${IDS.KEY_POOL_ENABLE}`,
-    [IDS.KEY_POOL_ROW]: `#${IDS.KEY_POOL_ROW}`,
-    [IDS.KEY_POOL_URL]: `#${IDS.KEY_POOL_URL}`,
-    [IDS.KEY_POOL_TOKEN]: `#${IDS.KEY_POOL_TOKEN}`,
-    [IDS.KEY_POOL_PICK]: `#${IDS.KEY_POOL_PICK}`,
+	// DOM_IDS 中的选择器
+	[IDS.CONFIG_BUTTONS]: `#${IDS.CONFIG_BUTTONS}`,
+	[IDS.CREATE_BUTTONS]: `#${IDS.CREATE_BUTTONS}`,
+	[IDS.NO_CONFIG_TIP]: `#${IDS.NO_CONFIG_TIP}`,
+	[IDS.CONFIG_PANEL]: `#${IDS.CONFIG_PANEL}`,
+	[IDS.OPEN_BUILD_FOLDER]: `#${IDS.OPEN_BUILD_FOLDER}`,
+	[IDS.OPEN_CONFIG]: `#${IDS.OPEN_CONFIG}`,
+	[IDS.IMPORT_CONFIG]: `#${IDS.IMPORT_CONFIG}`,
+	[IDS.EXPORT_CONFIG]: `#${IDS.EXPORT_CONFIG}`,
+	[IDS.IMPORT_CONFIG_CREATE]: `#${IDS.IMPORT_CONFIG_CREATE}`,
+	[IDS.CREATE_CONFIG]: `#${IDS.CREATE_CONFIG}`,
+	[IDS.BUILD]: `#${IDS.BUILD}`,
+	[IDS.BUILDING_MASK]: `#${IDS.BUILDING_MASK}`,
+	[IDS.STORE_CONTAINER]: `#${IDS.STORE_CONTAINER}`,
+	[IDS.COMPRESS_ENABLE]: `#${IDS.COMPRESS_ENABLE}`,
+	[IDS.COMPRESS_SUBSECTION]: `#${IDS.COMPRESS_SUBSECTION}`,
+	[IDS.COMPRESS_QUALITY]: `#${IDS.COMPRESS_QUALITY}`,
+	[IDS.COMPRESS_SKIP_ROW]: `#${IDS.COMPRESS_SKIP_ROW}`,
+	[IDS.COMPRESS_SKIP_LIST]: `#${IDS.COMPRESS_SKIP_LIST}`,
+	[IDS.COMPRESS_SKIP_ADD]: `#${IDS.COMPRESS_SKIP_ADD}`,
+	[IDS.COMPRESS_QUALITY_ROW]: `#${IDS.COMPRESS_QUALITY_ROW}`,
+	[IDS.COMPRESS_CONCURRENCY]: `#${IDS.COMPRESS_CONCURRENCY}`,
+	[IDS.COMPRESS_CONCURRENCY_ROW]: `#${IDS.COMPRESS_CONCURRENCY_ROW}`,
 
-    // 渠道相关选择器
-    ...CHANNEL_OPTIONS.reduce(
-        (acc, channel) => ({
-            ...acc,
-            [channel]: `#${channel}`,
-            [`${channel}-section`]: `#${channel}-section`,
-            [`${channel}-head`]: `#${channel}-head`,
-            [`${channel}-body`]: `#${channel}-body`,
-            [`${channel}-sdkScript`]: `#${channel}-sdkScript`,
-            [`${channel}-tip`]: `#${channel}-tip`
-        }),
-        {}
-    ),
-    channelTipsContainer: '#channelTipsContainer',
-    defaultTipContainer: '#defaultTipContainer'
+	// 渠道相关选择器
+	...CHANNEL_OPTIONS.reduce(
+		(acc, channel) => ({
+			...acc,
+			[channel]: `#${channel}`,
+			[`${channel}-section`]: `#${channel}-section`,
+			[`${channel}-head`]: `#${channel}-head`,
+			[`${channel}-body`]: `#${channel}-body`,
+			[`${channel}-sdkScript`]: `#${channel}-sdkScript`,
+			[`${channel}-tip`]: `#${channel}-tip`,
+		}),
+		{},
+	),
+	channelTipsContainer: "#channelTipsContainer",
+	defaultTipContainer: "#defaultTipContainer",
 };

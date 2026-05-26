@@ -444,9 +444,12 @@ type TAdapterRC = {
 	injectOptions?: {
 		[key in TChannel]: TChannelRC;
 	};
-	tinify?: boolean;
-	tinifyApiKey?: string;
-	tinifySkipUuids?: string[];
+	compress?: {
+		enable?: boolean;
+		quality?: number;
+		skipUuids?: string[];
+		concurrency?: number;
+	};
 	isZip?: boolean;
 	storePath?: string;
 };

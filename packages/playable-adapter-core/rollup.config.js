@@ -45,7 +45,7 @@ export default [
         }
       }),
     ],
-    external: ['fs', 'path']
+    external: ['fs', 'path', 'os', 'sharp']
   },
   {
     input: `src/index.ts`,

@@ -1,22 +1,40 @@
-'use strict';
+import { shell } from "electron";
+import { existsSync, promises } from "fs";
 
-import { shell } from 'electron';
-import { existsSync, promises } from 'fs';
-import https from 'https';
-
-import { ADAPTER_RC_PATH } from '../../extensions/constants';
-import { readAdapterRCFileForPanel } from '../../extensions/utils/file-system/adapterrc';
-import { logger } from '../utils/logger';
-import { CHANNEL_OPTIONS, CHANNEL_TIPS, CONFIG, DEFAULT_TIP, EVENT_TYPES, IDS, SELECTORS, STYLE, TEMPLATE } from './config';
-import { HTMLCustomElement, ICustomPanelThis, ITaskOptions, PACKAGE_NAME, TCustomPanelElements, TStoreConfig } from './types';
+import { ADAPTER_RC_PATH } from "../../extensions/constants";
+import { readAdapterRCFileForPanel } from "../../extensions/utils/file-system/adapterrc";
+import { logger } from "../utils/logger";
+import {
+	CHANNEL_OPTIONS,
+	CHANNEL_TIPS,
+	CONFIG,
+	DEFAULT_TIP,
+	EVENT_TYPES,
+	IDS,
+	SELECTORS,
+	STYLE,
+	TEMPLATE,
+} from "./config";
+import {
+	type HTMLCustomElement,
+	type ICustomPanelThis,
+	type ITaskOptions,
+	PACKAGE_NAME,
+	type TCustomPanelElements,
+	type TStoreConfig,
+} from "./types";
 
 let panel: ICustomPanelThis;
 let unsubscribeBuildState: (() => void) | null = null;
 let _eventsInitialized = false;
-let _buildFinishedHandler: (() => void) | null = null;
-let _buildStateHandler: ((state: { building: boolean; error?: string }) => void) | null = null;
+let _buildStateHandler:
+	| ((state: { building: boolean; error?: string }) => void)
+	| null = null;
 let _updateLanguageHandler: ((lang: string) => void) | null = null;
 let isBuilding = false;
+let currentBuildTaskId: string | undefined;
+
+const DEFAULT_COMPRESS_QUALITY = 60;
 
 export const style = STYLE;
 export const template = TEMPLATE;
@@ -25,29 +43,62 @@ export const $ = SELECTORS;
 /**
  * 初始化构建状态监听器
  */
-function initBuildStateListener() {
-	_buildStateHandler = ({ building, error }) => {
-		isBuilding = building;
-		const mask = panel.$[IDS.BUILDING_MASK];
-		if (!mask) {
-			logger.error('找不到构建遮罩层元素');
-			return;
-		}
+function applyBuildState(state: {
+	building: boolean;
+	taskId?: string;
+	error?: string;
+}) {
+	const { building, taskId, error } = state;
+	const stateChanged = isBuilding !== building || currentBuildTaskId !== taskId;
+	isBuilding = building;
+	currentBuildTaskId = taskId;
+	const mask = panel.$[IDS.BUILDING_MASK];
+	if (!mask) {
+		logger.error("找不到构建遮罩层元素");
+		return;
+	}
 
-		if (building) {
-			mask.classList.add('active');
-			logger.log('构建中...');
-		} else {
-			mask.classList.remove('active');
-			if (error) {
-				logger.error('构建失败:', error);
-			}
+	if (building) {
+		mask.classList.add("active");
+		if (stateChanged) {
+			logger.log("构建中...");
 		}
+	} else {
+		mask.classList.remove("active");
+		if (error) {
+			logger.error("构建失败:", error);
+		}
+	}
+}
+
+async function syncBuildState() {
+	try {
+		const state = await Editor.Message.request(
+			PACKAGE_NAME,
+			"query-build-state",
+		);
+		applyBuildState(
+			state as { building: boolean; taskId?: string; error?: string },
+		);
+	} catch (error) {
+		logger.warn("同步构建状态失败:", error);
+	}
+}
+
+function initBuildStateListener() {
+	_buildStateHandler = (state) => {
+		applyBuildState(state);
 	};
-	Editor.Message.addBroadcastListener('adapter:build-state', _buildStateHandler);
+	Editor.Message.addBroadcastListener(
+		"adapter:build-state",
+		_buildStateHandler,
+	);
 	unsubscribeBuildState = () => {
 		if (_buildStateHandler) {
-			Editor.Message.removeBroadcastListener('adapter:build-state', _buildStateHandler);
+			Editor.Message.removeBroadcastListener(
+				"adapter:build-state",
+				_buildStateHandler,
+			);
 			_buildStateHandler = null;
 		}
 	};
@@ -80,7 +131,7 @@ async function initStoreConfig(config: TAdapterRC) {
 		const storeConfig = await readStoreConfig(config.storePath);
 		createStoreSection(storeConfig);
 	} catch (err) {
-		logger.error('初始化商店配置失败:', err);
+		logger.error("初始化商店配置失败:", err);
 	}
 }
 
@@ -94,43 +145,37 @@ async function initPanelConfig(config: TAdapterRC) {
 		await init();
 		await initStoreConfig(config);
 	} catch (err) {
-		logger.error('初始化面板配置失败:', err);
+		logger.error("初始化面板配置失败:", err);
 	}
 }
 
 export async function ready(options: ITaskOptions) {
 	try {
 		// 初始化面板实例
-		// @ts-ignore
+		// @ts-expect-error
 		panel = this as ICustomPanelThis;
 		panel.options = options;
 
 		// 初始化构建状态监听器
 		initBuildStateListener();
-
-		_buildFinishedHandler = () => {
-			setTimeout(async () => {
-				const refreshed = await handlePoolRefreshAfterBuild();
-				if (!refreshed) {
-					await handleValidateKeyClick();
-				}
-			}, 500);
-		};
-		Editor.Message.addBroadcastListener('adapter:build-finished', _buildFinishedHandler);
+		await syncBuildState();
 
 		_updateLanguageHandler = (lang: string) => {
 			const config = getOptions();
 			config.lang = lang;
 
-			const langInput = panel.$['lang'];
+			const langInput = panel.$["lang"];
 			if (langInput) {
 				langInput.value = lang;
 			}
 
 			setOptions(config);
-			logger.log('面板语言已更新为:', lang);
+			logger.log("面板语言已更新为:", lang);
 		};
-		Editor.Message.addBroadcastListener('update-panel-language', _updateLanguageHandler);
+		Editor.Message.addBroadcastListener(
+			"update-panel-language",
+			_updateLanguageHandler,
+		);
 
 		// 读取配置文件
 		const config = readAdapterRCFileForPanel();
@@ -143,7 +188,7 @@ export async function ready(options: ITaskOptions) {
 			await initPanelConfig(config);
 		}
 	} catch (err) {
-		logger.error('面板初始化失败:', err);
+		logger.error("面板初始化失败:", err);
 	}
 }
 
@@ -156,10 +201,6 @@ export async function update(options: ITaskOptions, key: string) {
 	try {
 		const config = options.packages[PACKAGE_NAME];
 		if (config) {
-			const current = getOptions();
-			if (current.tinifySkipUuids && !config.tinifySkipUuids) {
-				config.tinifySkipUuids = current.tinifySkipUuids;
-			}
 			await applyConfig(config);
 			await saveConfigToFile(config);
 		} else {
@@ -170,7 +211,7 @@ export async function update(options: ITaskOptions, key: string) {
 			}
 		}
 	} catch (err: any) {
-		logger.error('更新配置失败:', err.message);
+		logger.error("更新配置失败:", err.message);
 	}
 }
 
@@ -190,12 +231,11 @@ export function close() {
 			unsubscribeBuildState = null;
 		}
 
-		if (_buildFinishedHandler) {
-			Editor.Message.removeBroadcastListener('adapter:build-finished', _buildFinishedHandler);
-			_buildFinishedHandler = null;
-		}
 		if (_updateLanguageHandler) {
-			Editor.Message.removeBroadcastListener('update-panel-language', _updateLanguageHandler);
+			Editor.Message.removeBroadcastListener(
+				"update-panel-language",
+				_updateLanguageHandler,
+			);
 			_updateLanguageHandler = null;
 		}
 
@@ -208,15 +248,23 @@ export function close() {
 		// 清空面板的 $ 对象
 		panel.$ = {} as TCustomPanelElements;
 	} catch (err) {
-		logger.error('关闭面板时出错:', err);
+		logger.error("关闭面板时出错:", err);
 	}
 }
 
 // 工具函数
-function addEventListenerWithDispatch(element: any, eventType: string, field: string) {
+function addEventListenerWithDispatch(
+	element: any,
+	eventType: string,
+	field: string,
+) {
 	element.addEventListener(eventType, (event: any) => {
 		// 使用正确的字段路径格式
-		panel.dispatch('update', `packages.${PACKAGE_NAME}.${field}`, event.target.value);
+		panel.dispatch(
+			"update",
+			`packages.${PACKAGE_NAME}.${field}`,
+			event.target.value,
+		);
 	});
 }
 
@@ -224,356 +272,171 @@ function addChannelInputListeners(channel: TChannel) {
 	CONFIG.INJECT_FIELDS.forEach((field) => {
 		const input = panel.$[`${channel}-${field}`];
 		if (input) {
-			addEventListenerWithDispatch(input, 'confirm', `injectOptions.${channel}.${field}`);
+			addEventListenerWithDispatch(
+				input,
+				"confirm",
+				`injectOptions.${channel}.${field}`,
+			);
 		}
 	});
 }
 
-function validateTinifyApiKey(apiKey: string): Promise<{ valid: boolean; count: number; exceeded: boolean; message: string }> {
-	return new Promise((resolve) => {
-		const req = https.request({
-			hostname: 'api.tinify.com',
-			path: '/shrink',
-			method: 'POST',
-			auth: `api:${apiKey}`,
-		}, (res) => {
-			const count = parseInt(res.headers['compression-count'] as string, 10) || 0;
-
-			if (res.statusCode === 401) {
-				resolve({ valid: false, count: 0, exceeded: false, message: 'API Key 无效' });
-			} else if (res.statusCode === 429) {
-				resolve({ valid: true, count, exceeded: true, message: '配额已用尽' });
-			} else {
-				resolve({ valid: true, count, exceeded: false, message: '' });
-			}
-
-			res.resume();
-		});
-
-		req.on('error', (err) => {
-			resolve({ valid: false, count: 0, exceeded: false, message: `验证失败: ${err.message}` });
-		});
-
-		req.end();
-	});
+function normalizeQuality(value: unknown): number {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) {
+		return DEFAULT_COMPRESS_QUALITY;
+	}
+	return Math.min(100, Math.max(1, Math.round(parsed)));
 }
 
-// tinify 复选框的事件处理函数
-const handleTinifyChange = (event: any) => {
-	updateTinifyKeyVisibility(event.target.value);
-	panel.dispatch('update', `packages.${PACKAGE_NAME}.tinify`, event.target.value);
+type TCompressFormState = {
+	enable: boolean;
+	quality: number;
+	skipUuids: string[];
+	concurrency?: number;
+};
+
+function ensureCompressConfig(config: TAdapterRC): TCompressFormState {
+	const normalized: TCompressFormState = {
+		enable: !!config.compress?.enable,
+		quality: normalizeQuality(
+			config.compress?.quality ?? DEFAULT_COMPRESS_QUALITY,
+		),
+		skipUuids: config.compress?.skipUuids ?? [],
+	};
+	if (config.compress?.concurrency && config.compress.concurrency > 0) {
+		normalized.concurrency = config.compress.concurrency;
+	}
+	config.compress = normalized;
+	return normalized;
+}
+
+function updateCompressVisibility(isVisible: boolean) {
+	const subsection = panel.$[IDS.COMPRESS_SUBSECTION];
+	if (subsection) {
+		subsection.style.display = isVisible ? "" : "none";
+	}
+}
+
+// compress 复选框的事件处理函数
+const handleCompressEnableChange = (event: any) => {
+	const config = getOptions();
+	const compress = ensureCompressConfig(config);
+	compress.enable = event.target.value === true;
+	config.compress = compress;
+	updateCompressVisibility(compress.enable);
+	panel.options.packages[PACKAGE_NAME] = config;
+	panel.dispatch("update", `packages.${PACKAGE_NAME}.compress`, compress);
+	saveConfigToFile(config).catch((err: any) => {
+		logger.error("保存压缩配置失败:", err.message);
+	});
+};
+
+const handleCompressQualityChange = (event: any) => {
+	const rawValue = event?.target?.value ?? event?.detail?.value;
+	const quality = normalizeQuality(rawValue);
+
+	const config = getOptions();
+	const compress = ensureCompressConfig(config);
+	compress.quality = quality;
+	config.compress = compress;
+
+	const slider = panel.$[IDS.COMPRESS_QUALITY];
+	if (slider) {
+		slider.value = quality;
+		slider.setAttribute("value", String(quality));
+	}
+
+	panel.options.packages[PACKAGE_NAME] = config;
+	panel.dispatch("update", `packages.${PACKAGE_NAME}.compress`, compress);
+	saveConfigToFile(config).catch((err: any) => {
+		logger.error("保存压缩质量失败:", err.message);
+	});
+};
+
+const handleCompressConcurrencyChange = (event: any) => {
+	const rawValue = event?.target?.value ?? event?.detail?.value;
+	const parsed = Number(rawValue);
+	const concurrency =
+		Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+
+	const config = getOptions();
+	const compress = ensureCompressConfig(config);
+	if (concurrency) {
+		compress.concurrency = concurrency;
+	} else {
+		delete compress.concurrency;
+	}
+	config.compress = compress;
+	panel.options.packages[PACKAGE_NAME] = config;
+	panel.dispatch("update", `packages.${PACKAGE_NAME}.compress`, compress);
+	saveConfigToFile(config).catch((err: any) => {
+		logger.error("保存压缩并发数失败:", err.message);
+	});
 };
 
 // enableSplash 复选框的事件处理函数
 const handleEnableSplashChange = (event: any) => {
-	panel.dispatch('update', `packages.${PACKAGE_NAME}.enableSplash`, event.target.value);
+	panel.dispatch(
+		"update",
+		`packages.${PACKAGE_NAME}.enableSplash`,
+		event.target.value,
+	);
 };
 
 // skipBuild 复选框的事件处理函数
 const handleSkipBuildChange = (event: any) => {
-	panel.dispatch('update', `packages.${PACKAGE_NAME}.skipBuild`, event.target.value);
+	panel.dispatch(
+		"update",
+		`packages.${PACKAGE_NAME}.skipBuild`,
+		event.target.value,
+	);
 };
 
 // isZip 复选框的事件处理函数
 const handleIsZipChange = (event: any) => {
-	panel.dispatch('update', `packages.${PACKAGE_NAME}.isZip`, event.target.value);
-};
-
-// --- Editor.Profile 通用读写 ---
-async function profileGet<T>(key: string, fallback: T): Promise<T> {
-	try {
-		const val = await Editor.Profile.getConfig(PACKAGE_NAME, key, 'global');
-		if (val != null) return val as T;
-	} catch (_) { /* ignore */ }
-	return fallback;
-}
-
-async function profileSet(key: string, value: any): Promise<void> {
-	try {
-		await Editor.Profile.setConfig(PACKAGE_NAME, key, value, 'global');
-	} catch (_) { /* ignore */ }
-}
-
-const PROFILE_KEYS = {
-	compressionMax: 'tinifyCompressionMax',
-	poolEnable: 'keyPoolEnable',
-	poolUrl: 'keyPoolUrl',
-	poolToken: 'keyPoolToken',
-} as const;
-
-function pickKeyFromPool(baseUrl: string, token: string): Promise<{
-	key: string;
-	monthly_usage: number;
-	monthly_limit: number;
-	remaining: number;
-}> {
-	return new Promise((resolve, reject) => {
-		const url = new URL('/pick', baseUrl);
-		const isHttps = url.protocol === 'https:';
-		const mod = isHttps ? https : require('http');
-
-		const req = mod.request(url.toString(), {
-			method: 'GET',
-			headers: { 'Authorization': `Bearer ${token}` }
-		}, (res: any) => {
-			let data = '';
-			res.on('data', (chunk: string) => data += chunk);
-			res.on('end', () => {
-				if (res.statusCode === 200) {
-					try {
-						const body = JSON.parse(data);
-						if (body.success && body.data) {
-							resolve(body.data);
-						} else {
-							reject(new Error('号池返回异常'));
-						}
-					} catch (e) {
-						reject(new Error('号池响应解析失败'));
-					}
-				} else if (res.statusCode === 503) {
-					reject(new Error('号池无可用 Key'));
-				} else {
-					reject(new Error(`号池请求失败: ${res.statusCode}`));
-				}
-			});
-		});
-		req.on('error', (e: Error) => reject(new Error(`号池连接失败: ${e.message}`)));
-		req.end();
-	});
-}
-
-function refreshKeyInPool(baseUrl: string, token: string, key: string): Promise<{
-	key: string;
-	monthly_usage: number;
-	monthly_limit: number;
-	remaining: number;
-	valid: boolean;
-}> {
-	return new Promise((resolve, reject) => {
-		const url = new URL('/pick/refresh', baseUrl);
-		const isHttps = url.protocol === 'https:';
-		const mod = isHttps ? https : require('http');
-		const payload = JSON.stringify({ key });
-
-		const req = mod.request(url.toString(), {
-			method: 'POST',
-			headers: {
-				'Authorization': `Bearer ${token}`,
-				'Content-Type': 'application/json',
-				'Content-Length': Buffer.byteLength(payload)
-			}
-		}, (res: any) => {
-			let data = '';
-			res.on('data', (chunk: string) => data += chunk);
-			res.on('end', () => {
-				if (res.statusCode === 200) {
-					try {
-						const body = JSON.parse(data);
-						if (body.success && body.data) {
-							resolve(body.data);
-						} else {
-							reject(new Error('号池刷新返回异常'));
-						}
-					} catch (e) {
-						reject(new Error('号池刷新响应解析失败'));
-					}
-				} else if (res.statusCode === 404) {
-					const err = new Error('号池中不存在该 Key');
-					(err as any).keyNotInPool = true;
-					reject(err);
-				} else {
-					reject(new Error(`号池刷新请求失败: ${res.statusCode}`));
-				}
-			});
-		});
-		req.on('error', (e: Error) => reject(new Error(`号池刷新连接失败: ${e.message}`)));
-		req.write(payload);
-		req.end();
-	});
-}
-
-const applyPickedKey = async (poolUrl: string, poolToken: string) => {
-	const result = await pickKeyFromPool(poolUrl, poolToken);
-	const apiKeyInput = panel.$['tinifyApiKey'];
-	if (apiKeyInput) {
-		apiKeyInput.value = result.key;
-		panel.dispatch('update', `packages.${PACKAGE_NAME}.tinifyApiKey`, result.key);
-	}
-	const max = result.monthly_limit || await profileGet<number>(PROFILE_KEYS.compressionMax, 500);
-	if (result.monthly_limit) {
-		await profileSet(PROFILE_KEYS.compressionMax, result.monthly_limit);
-		const maxInput = panel.$[IDS.COMPRESSION_MAX];
-		if (maxInput) maxInput.setAttribute('value', String(result.monthly_limit));
-	}
-	updateCompressionProgress(result.monthly_usage, max);
-	logger.info(`已自动切换至新 Key: ${result.key.slice(0, 8)}...（剩余 ${result.remaining} 次）`);
-};
-
-const handlePoolRefreshAfterBuild = async (): Promise<boolean> => {
-	const poolUrl = (panel.$[IDS.KEY_POOL_URL]?.value?.trim()) || await profileGet<string>(PROFILE_KEYS.poolUrl, '');
-	const poolToken = (panel.$[IDS.KEY_POOL_TOKEN]?.value?.trim()) || await profileGet<string>(PROFILE_KEYS.poolToken, '');
-	const config = getOptions();
-	const apiKey = config.tinifyApiKey;
-
-	if (!poolUrl || !poolToken || !apiKey) return false;
-
-	try {
-		const result = await refreshKeyInPool(poolUrl, poolToken, apiKey);
-		const max = result.monthly_limit || await profileGet<number>(PROFILE_KEYS.compressionMax, 500);
-		updateCompressionProgress(result.monthly_usage, max);
-
-		const poolEnabled = panel.$[IDS.KEY_POOL_ENABLE]?.value === true;
-		if ((result.remaining <= 0 || !result.valid) && poolEnabled) {
-			logger.warn(`当前 Key 额度已用尽或失效，正在从号池获取新 Key...`);
-			await applyPickedKey(poolUrl, poolToken);
-		}
-		return true;
-	} catch (err: any) {
-		if (err.keyNotInPool) return false;
-		logger.warn('号池刷新失败:', err.message);
-		return false;
-	}
-};
-
-const handleKeyPoolPickClick = async () => {
-	const poolUrl = panel.$[IDS.KEY_POOL_URL]?.value?.trim();
-	const poolToken = panel.$[IDS.KEY_POOL_TOKEN]?.value?.trim();
-	const pickBtn = panel.$[IDS.KEY_POOL_PICK];
-	const countLabel = panel.$[IDS.COMPRESSION_COUNT];
-
-	if (!poolUrl || !poolToken) {
-		if (countLabel) {
-			countLabel.setAttribute('value', '请填写号池地址和 Token');
-			countLabel.style.color = '#ff4d4f';
-		}
-		return;
-	}
-
-	pickBtn?.setAttribute('disabled', '');
-	if (countLabel) {
-		countLabel.setAttribute('value', '正在获取 Key...');
-		countLabel.style.color = '';
-	}
-
-	try {
-		await profileSet(PROFILE_KEYS.poolUrl, poolUrl);
-		await profileSet(PROFILE_KEYS.poolToken, poolToken);
-		await applyPickedKey(poolUrl, poolToken);
-		if (countLabel) countLabel.style.color = '';
-	} catch (err: any) {
-		if (countLabel) {
-			countLabel.setAttribute('value', err.message);
-			countLabel.style.color = '#ff4d4f';
-		}
-	} finally {
-		pickBtn?.removeAttribute('disabled');
-	}
-};
-
-function updateKeyPoolVisibility(isVisible: boolean) {
-	const poolRow = panel.$[IDS.KEY_POOL_ROW];
-	if (poolRow) {
-		poolRow.style.display = isVisible ? '' : 'none';
-	}
-}
-
-let lastCompressionCount = -1;
-
-function updateCompressionProgress(count: number, max: number) {
-	lastCompressionCount = count;
-	const progress = panel.$[IDS.COMPRESSION_PROGRESS];
-	const countLabel = panel.$[IDS.COMPRESSION_COUNT];
-
-	if (!progress || !countLabel) return;
-
-	const percent = Math.min(Math.round((count / max) * 100), 100);
-	progress.setAttribute('value', String(percent));
-
-	progress.removeAttribute('success');
-	progress.removeAttribute('failure');
-	if (percent >= 100) {
-		progress.setAttribute('failure', '');
-	} else if (percent < 80) {
-		progress.setAttribute('success', '');
-	}
-
-	countLabel.setAttribute('value', `已使用 ${count} /`);
-}
-
-// 配额上限变更处理
-const handleCompressionMaxChange = async (event: any) => {
-	const raw = event.target.value ?? event.detail?.value;
-	const val = parseInt(raw, 10);
-	if (val > 0) {
-		await profileSet(PROFILE_KEYS.compressionMax, val);
-		await handleValidateKeyClick();
-	}
-};
-
-// 验证 API Key 按钮的事件处理函数
-const handleValidateKeyClick = async () => {
-	const config = getOptions();
-	const apiKey = config.tinifyApiKey;
-	const countLabel = panel.$[IDS.COMPRESSION_COUNT];
-	const validateBtn = panel.$[IDS.VALIDATE_KEY];
-
-	if (!apiKey) {
-		countLabel.setAttribute('value', '请先填写 API Key');
-		countLabel.style.color = '#ff4d4f';
-		return;
-	}
-
-	validateBtn.setAttribute('disabled', '');
-	countLabel.setAttribute('value', '验证中...');
-	countLabel.style.color = '';
-
-	try {
-		const result = await validateTinifyApiKey(apiKey);
-		const max = await profileGet<number>(PROFILE_KEYS.compressionMax, 500);
-
-		if (result.valid) {
-			const count = result.exceeded && result.count === 0 ? max : result.count;
-			updateCompressionProgress(count, max);
-		} else {
-			countLabel.setAttribute('value', result.message);
-			countLabel.style.color = '#ff4d4f';
-		}
-	} catch (err: any) {
-		countLabel.setAttribute('value', `验证异常: ${err.message}`);
-		countLabel.style.color = '#ff4d4f';
-	} finally {
-		validateBtn.removeAttribute('disabled');
-	}
+	panel.dispatch(
+		"update",
+		`packages.${PACKAGE_NAME}.isZip`,
+		event.target.value,
+	);
 };
 
 async function initBaseConfig() {
 	const config = getOptions();
 
 	// 基础配置字段
-	const baseFields = ['fileName', 'lang', 'title', 'iosUrl', 'androidUrl', 'buildPlatform', 'tinifyApiKey'] as const;
+	const baseFields = [
+		"fileName",
+		"lang",
+		"title",
+		"iosUrl",
+		"androidUrl",
+		"buildPlatform",
+	] as const;
 	baseFields.forEach((field) => {
 		const input: HTMLCustomElement = panel.$[field];
-		input.value = config[field] ?? '';
+		input.value = config[field] ?? "";
 		if (!_eventsInitialized) {
-			addEventListenerWithDispatch(input, 'confirm', field);
+			addEventListenerWithDispatch(input, "confirm", field);
 		}
 	});
 
 	// 商店配置路径
-	const storePath = panel.$['storePath'];
+	const storePath = panel.$["storePath"];
 	if (storePath) {
-		storePath.value = config.storePath ?? '';
+		storePath.value = config.storePath ?? "";
 		if (!_eventsInitialized) {
 			storePath.addEventListener(EVENT_TYPES.CHANGE, async (event: any) => {
 				const path = event.target.value;
-				panel.dispatch('update', `packages.${PACKAGE_NAME}.storePath`, path);
+				panel.dispatch("update", `packages.${PACKAGE_NAME}.storePath`, path);
 
 				if (path) {
 					try {
 						const storeConfig = await readStoreConfig(path);
 						createStoreSection(storeConfig);
 					} catch (err) {
-						logger.error('处理商店配置失败:', err);
+						logger.error("处理商店配置失败:", err);
 					}
 				} else {
 					createStoreSection([]);
@@ -583,116 +446,98 @@ async function initBaseConfig() {
 	}
 
 	// 屏幕方向
-	panel.$['orientation'].value = config.orientation ?? CONFIG.DEFAULT_ORIENTATION;
+	panel.$["orientation"].value =
+		config.orientation ?? CONFIG.DEFAULT_ORIENTATION;
 	if (!_eventsInitialized) {
-		addEventListenerWithDispatch(panel.$['orientation'], 'change', 'orientation');
+		addEventListenerWithDispatch(
+			panel.$["orientation"],
+			"change",
+			"orientation",
+		);
 	}
 
 	// 启用图片压缩
-	const tinify = panel.$['tinify'];
-	tinify.value = config.tinify;
-	tinify.addEventListener(EVENT_TYPES.CHANGE, handleTinifyChange);
-	updateTinifyKeyVisibility(config.tinify === true);
+	const compress = ensureCompressConfig(config);
+	const compressEnable = panel.$[IDS.COMPRESS_ENABLE];
+	compressEnable.value = compress.enable;
+
+	const compressQuality = panel.$[IDS.COMPRESS_QUALITY];
+	compressQuality.value = compress.quality;
+	compressQuality.setAttribute("value", String(compress.quality));
+	updateCompressVisibility(compress.enable);
+
+	if (!_eventsInitialized) {
+		compressEnable.addEventListener(
+			EVENT_TYPES.CHANGE,
+			handleCompressEnableChange,
+		);
+		compressQuality.addEventListener(
+			EVENT_TYPES.CHANGE,
+			handleCompressQualityChange,
+		);
+		compressQuality.addEventListener(
+			EVENT_TYPES.CONFIRM,
+			handleCompressQualityChange,
+		);
+	}
 
 	// 跳过压缩 UUID 列表
-	initSkipUuidsList(config.tinifySkipUuids || []);
-	const addBtn = panel.$['tinifySkipUuidsAdd'];
-	addBtn.onclick = () => addSkipUuidRow('');
+	initSkipUuidsList(compress.skipUuids ?? []);
+	const addBtn = panel.$[IDS.COMPRESS_SKIP_ADD];
+	if (addBtn) {
+		addBtn.style.flex = "0 0 auto";
+		addBtn.style.width = "32px";
+		addBtn.style.marginLeft = "auto";
+		addBtn.onclick = () => addSkipUuidRow("");
+	}
 
-	// 验证 API Key 按钮
-	const validateBtn = panel.$[IDS.VALIDATE_KEY];
-	validateBtn.addEventListener(EVENT_TYPES.CLICK, handleValidateKeyClick);
-
-	// 通过 JS 调整按钮和输入框的布局样式（HTML inline style 不生效）
-	const tinifyApiKeyInput = panel.$['tinifyApiKey'];
-	tinifyApiKeyInput.style.flex = '1';
-	validateBtn.style.flex = '0 0 auto';
-	validateBtn.style.marginLeft = '4px';
-
-	// 调整 ui-prop 内 content slot 容器的间距
-	const tinifyKeyRow = panel.$[IDS.TINIFY_KEY_ROW];
-	if (tinifyKeyRow?.shadowRoot) {
-		const contentEl = tinifyKeyRow.shadowRoot.querySelector('.content') as HTMLElement | null;
-		if (contentEl) {
-			contentEl.style.gap = '4px';
+	// 压缩并发数（可选，留空则用 CPU 核心数）
+	const compressConcurrency = panel.$[IDS.COMPRESS_CONCURRENCY];
+	if (compressConcurrency) {
+		compressConcurrency.value = compress.concurrency ?? "";
+		compressConcurrency.setAttribute(
+			"value",
+			compress.concurrency != null ? String(compress.concurrency) : "",
+		);
+		if (!_eventsInitialized) {
+			compressConcurrency.addEventListener(
+				EVENT_TYPES.CHANGE,
+				handleCompressConcurrencyChange,
+			);
+			compressConcurrency.addEventListener(
+				EVENT_TYPES.CONFIRM,
+				handleCompressConcurrencyChange,
+			);
 		}
 	}
 
-	// API Key 输入确认后自动验证
-	if (!_eventsInitialized) {
-		tinifyApiKeyInput.addEventListener('confirm', () => {
-			setTimeout(() => handleValidateKeyClick(), 0);
-		});
-	}
-
-	// 配额上限输入框
-	const compressionMaxInput = panel.$[IDS.COMPRESSION_MAX];
-	compressionMaxInput.setAttribute('value', String(await profileGet<number>(PROFILE_KEYS.compressionMax, 500)));
-	compressionMaxInput.addEventListener('confirm', handleCompressionMaxChange);
-	compressionMaxInput.addEventListener('change', handleCompressionMaxChange);
-
-	// 通过 JS 设置进度条的 flex 布局样式
-	const compressionProgress = panel.$[IDS.COMPRESSION_PROGRESS];
-	compressionProgress.style.flex = '1';
-	compressionMaxInput.style.flex = '0 0 auto';
-	compressionMaxInput.style.width = '64px';
-
-	// 延迟一帧自动验证（如果有 API Key）
-	if (config.tinifyApiKey) {
-		setTimeout(() => handleValidateKeyClick(), 0);
-	}
-
-	// 号池服务
-	const keyPoolEnable = panel.$[IDS.KEY_POOL_ENABLE];
-	const keyPoolUrlInput = panel.$[IDS.KEY_POOL_URL];
-	const keyPoolTokenInput = panel.$[IDS.KEY_POOL_TOKEN];
-	const keyPoolPickBtn = panel.$[IDS.KEY_POOL_PICK];
-
-	const savedPoolEnable = await profileGet<boolean>(PROFILE_KEYS.poolEnable, false);
-	keyPoolEnable.value = savedPoolEnable;
-	keyPoolUrlInput.value = await profileGet<string>(PROFILE_KEYS.poolUrl, '');
-	keyPoolTokenInput.value = await profileGet<string>(PROFILE_KEYS.poolToken, '');
-
-	if (!_eventsInitialized) {
-		keyPoolEnable.addEventListener(EVENT_TYPES.CHANGE, async (event: any) => {
-			const enabled = event.target.value === true;
-			await profileSet(PROFILE_KEYS.poolEnable, enabled);
-			updateKeyPoolVisibility(enabled);
-		});
-		keyPoolUrlInput.addEventListener('confirm', async () => {
-			await profileSet(PROFILE_KEYS.poolUrl, keyPoolUrlInput.value?.trim() || '');
-		});
-		keyPoolTokenInput.addEventListener('confirm', async () => {
-			await profileSet(PROFILE_KEYS.poolToken, keyPoolTokenInput.value?.trim() || '');
-		});
-	}
-	updateKeyPoolVisibility(savedPoolEnable);
-
-	keyPoolPickBtn.addEventListener(EVENT_TYPES.CLICK, handleKeyPoolPickClick);
-	keyPoolPickBtn.style.flex = '0 0 auto';
-	keyPoolPickBtn.style.marginLeft = '4px';
-
 	// 启用插屏
-	const enableSplash = panel.$['enableSplash'];
+	const enableSplash = panel.$["enableSplash"];
 	enableSplash.value = config.enableSplash;
-	enableSplash.addEventListener(EVENT_TYPES.CHANGE, handleEnableSplashChange);
+	if (!_eventsInitialized) {
+		enableSplash.addEventListener(EVENT_TYPES.CHANGE, handleEnableSplashChange);
+	}
 
 	// 跳过构建
-	const skipBuild = panel.$['skipBuild'];
+	const skipBuild = panel.$["skipBuild"];
 	skipBuild.value = config.skipBuild;
-	skipBuild.addEventListener(EVENT_TYPES.CHANGE, handleSkipBuildChange);
+	if (!_eventsInitialized) {
+		skipBuild.addEventListener(EVENT_TYPES.CHANGE, handleSkipBuildChange);
+	}
 
 	// isZip 复选框
-	const isZip = panel.$['isZip'];
+	const isZip = panel.$["isZip"];
 	isZip.value = config.isZip;
-	isZip.addEventListener(EVENT_TYPES.CHANGE, handleIsZipChange);
+	if (!_eventsInitialized) {
+		isZip.addEventListener(EVENT_TYPES.CHANGE, handleIsZipChange);
+	}
 }
 
 function collectSkipUuids(): string[] {
-	const list = panel.$['tinifySkipUuidsList'];
+	const list = panel.$[IDS.COMPRESS_SKIP_LIST];
 	if (!list || !(list instanceof HTMLElement)) return [];
 	const uuids: string[] = [];
-	list.querySelectorAll('ui-asset').forEach((asset: any) => {
+	list.querySelectorAll("ui-asset").forEach((asset: any) => {
 		const val = asset.value;
 		if (val) uuids.push(val);
 	});
@@ -702,48 +547,66 @@ function collectSkipUuids(): string[] {
 function dispatchSkipUuids() {
 	const uuids = collectSkipUuids();
 	const config = getOptions();
-	config.tinifySkipUuids = uuids;
+	const compress = ensureCompressConfig(config);
+	compress.skipUuids = uuids;
+	config.compress = compress;
 	panel.options.packages[PACKAGE_NAME] = config;
-	panel.dispatch('update', `packages.${PACKAGE_NAME}.tinifySkipUuids`, uuids);
+	panel.dispatch("update", `packages.${PACKAGE_NAME}.compress`, compress);
 	saveConfigToFile(config).catch((err: any) => {
-		logger.error('保存跳过 UUID 配置失败:', err.message);
+		logger.error("保存跳过 UUID 配置失败:", err.message);
 	});
 }
 
 function refreshSkipUuidIndices() {
-	const list = panel.$['tinifySkipUuidsList'];
+	const list = panel.$[IDS.COMPRESS_SKIP_LIST];
 	if (!list || !(list instanceof HTMLElement)) return;
-	const rows = list.querySelectorAll('.skip-uuid-row');
+	const rows = list.querySelectorAll(".skip-uuid-row");
 	rows.forEach((row, i) => {
-		const idx = row.querySelector('.skip-uuid-index');
+		const idx = row.querySelector(".skip-uuid-index");
 		if (idx) idx.textContent = String(i + 1);
 	});
 }
 
+function refreshSkipUuidEmptyHint() {
+	const list = panel.$[IDS.COMPRESS_SKIP_LIST];
+	if (!list || !(list instanceof HTMLElement)) return;
+	const existingHint = list.querySelector(".skip-uuid-empty");
+	const hasRows = list.querySelector(".skip-uuid-row") !== null;
+	if (!hasRows && !existingHint) {
+		const hint = document.createElement("div");
+		hint.className = "skip-uuid-empty";
+		hint.textContent = "未添加跳过项，点击右上 + 按钮添加";
+		list.appendChild(hint);
+	} else if (hasRows && existingHint) {
+		existingHint.remove();
+	}
+}
+
 function addSkipUuidRow(uuid: string) {
-	const list = panel.$['tinifySkipUuidsList'];
+	const list = panel.$[IDS.COMPRESS_SKIP_LIST];
 	if (!list || !(list instanceof HTMLElement)) return;
 
-	const row = document.createElement('div');
-	row.className = 'skip-uuid-row';
+	const row = document.createElement("div");
+	row.className = "skip-uuid-row";
 
-	const index = document.createElement('span');
-	index.className = 'skip-uuid-index';
+	const index = document.createElement("span");
+	index.className = "skip-uuid-index";
 
-	const asset = document.createElement('ui-asset') as any;
-	asset.setAttribute('droppable', 'cc.ImageAsset');
+	const asset = document.createElement("ui-asset") as HTMLCustomElement;
+	asset.setAttribute("droppable", "cc.ImageAsset");
 	if (uuid) asset.value = uuid;
-	asset.addEventListener('confirm', () => dispatchSkipUuids());
-	asset.addEventListener('change', () => dispatchSkipUuids());
+	asset.addEventListener("confirm", () => dispatchSkipUuids());
+	asset.addEventListener("change", () => dispatchSkipUuids());
 
-	const removeBtn = document.createElement('ui-button') as any;
-	removeBtn.textContent = '×';
-	removeBtn.className = 'skip-uuid-remove';
-	removeBtn.setAttribute('tooltip', '移除');
+	const removeBtn = document.createElement("ui-button") as HTMLCustomElement;
+	removeBtn.textContent = "×";
+	removeBtn.className = "skip-uuid-remove";
+	removeBtn.setAttribute("tooltip", "移除");
 	removeBtn.onclick = () => {
 		row.remove();
 		refreshSkipUuidIndices();
 		dispatchSkipUuids();
+		refreshSkipUuidEmptyHint();
 	};
 
 	row.appendChild(index);
@@ -752,44 +615,43 @@ function addSkipUuidRow(uuid: string) {
 	list.appendChild(row);
 
 	refreshSkipUuidIndices();
+	refreshSkipUuidEmptyHint();
+}
+
+function clearElementChildren(element: HTMLElement) {
+	while (element.firstChild) {
+		element.removeChild(element.firstChild);
+	}
+}
+
+function appendTipMessage(parent: HTMLElement, message: string) {
+	const boldPattern = /<b>(.*?)<\/b>/g;
+	let lastIndex = 0;
+	let match: RegExpExecArray | null;
+
+	while ((match = boldPattern.exec(message)) !== null) {
+		if (match.index > lastIndex) {
+			parent.appendChild(
+				document.createTextNode(message.slice(lastIndex, match.index)),
+			);
+		}
+		const bold = document.createElement("b");
+		bold.textContent = match[1];
+		parent.appendChild(bold);
+		lastIndex = match.index + match[0].length;
+	}
+
+	if (lastIndex < message.length) {
+		parent.appendChild(document.createTextNode(message.slice(lastIndex)));
+	}
 }
 
 function initSkipUuidsList(uuids: string[]) {
-	const list = panel.$['tinifySkipUuidsList'];
+	const list = panel.$[IDS.COMPRESS_SKIP_LIST];
 	if (!list || !(list instanceof HTMLElement)) return;
-	list.innerHTML = '';
+	clearElementChildren(list);
 	uuids.forEach((uuid) => addSkipUuidRow(uuid));
-}
-
-function updateTinifyKeyVisibility(isVisible: boolean) {
-	const keyRow = panel.$[IDS.TINIFY_KEY_ROW];
-	if (keyRow) {
-		keyRow.style.display = isVisible ? '' : 'none';
-	}
-
-	const validateRow = panel.$[IDS.TINIFY_VALIDATE_ROW];
-	if (validateRow) {
-		validateRow.style.display = isVisible ? '' : 'none';
-	}
-
-	const skipUuidsRow = panel.$[IDS.TINIFY_SKIP_UUIDS_ROW];
-	if (skipUuidsRow) {
-		skipUuidsRow.style.display = isVisible ? '' : 'none';
-	}
-
-	const keyPoolEnable = panel.$[IDS.KEY_POOL_ENABLE];
-	if (keyPoolEnable) {
-		const enableParent = keyPoolEnable.closest('ui-prop');
-		if (enableParent) {
-			(enableParent as HTMLElement).style.display = isVisible ? '' : 'none';
-		}
-	}
-
-	if (!isVisible) {
-		updateKeyPoolVisibility(false);
-	} else if (keyPoolEnable?.value === true) {
-		updateKeyPoolVisibility(true);
-	}
+	refreshSkipUuidEmptyHint();
 }
 
 function initChannels() {
@@ -798,9 +660,12 @@ function initChannels() {
 
 	CHANNEL_OPTIONS.forEach((channel) => {
 		const button = panel.$[channel];
-		button.setAttribute('type', selectedChannels.includes(channel) ? 'primary' : 'default');
+		button.setAttribute(
+			"type",
+			selectedChannels.includes(channel) ? "primary" : "default",
+		);
 		if (!_eventsInitialized) {
-			button.addEventListener('click', onChannelClick);
+			button.addEventListener("click", onChannelClick);
 			addChannelInputListeners(channel);
 		}
 	});
@@ -808,16 +673,22 @@ function initChannels() {
 
 function onChannelClick(event: any) {
 	const button = event.target;
-	const isSelected = button.getAttribute('type') === 'primary';
+	const isSelected = button.getAttribute("type") === "primary";
 
 	// 切换按钮状态
-	button.setAttribute('type', isSelected ? 'default' : 'primary');
+	button.setAttribute("type", isSelected ? "default" : "primary");
 
 	// 更新选中的渠道
-	const selectedChannels = CHANNEL_OPTIONS.filter((ch) => panel.$[ch].getAttribute('type') === 'primary');
+	const selectedChannels = CHANNEL_OPTIONS.filter(
+		(ch) => panel.$[ch].getAttribute("type") === "primary",
+	);
 
 	// 使用正确的字段路径格式
-	panel.dispatch('update', `packages.${PACKAGE_NAME}.exportChannels`, selectedChannels);
+	panel.dispatch(
+		"update",
+		`packages.${PACKAGE_NAME}.exportChannels`,
+		selectedChannels,
+	);
 
 	// 更新注入选项区域
 	updateInjectOptions();
@@ -842,8 +713,8 @@ function updateInjectOptions() {
 		const button = panel.$[channel];
 
 		// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查元素是否存在
-		const isSelected = button.getAttribute('type') === 'primary';
-		getStyle(`${channel}-section`).display = isSelected ? '' : 'none';
+		const isSelected = button.getAttribute("type") === "primary";
+		getStyle(`${channel}-section`).display = isSelected ? "" : "none";
 
 		if (isSelected) {
 			const headInput = panel.$[`${channel}-head`];
@@ -851,80 +722,83 @@ function updateInjectOptions() {
 			const sdkScriptInput = panel.$[`${channel}-sdkScript`];
 
 			// 确保injectOptions存在
-			const channelConfig = config.injectOptions && config.injectOptions[channel] ? config.injectOptions[channel] : { head: '', body: '', sdkScript: '' };
+			const channelConfig =
+				config.injectOptions && config.injectOptions[channel]
+					? config.injectOptions[channel]
+					: { head: "", body: "", sdkScript: "" };
 
 			// 设置输入框的值
-			headInput.value = channelConfig.head || '';
-			bodyInput.value = channelConfig.body || '';
-			sdkScriptInput.value = channelConfig.sdkScript || '';
+			headInput.value = channelConfig.head || "";
+			bodyInput.value = channelConfig.body || "";
+			sdkScriptInput.value = channelConfig.sdkScript || "";
 		}
 	});
 }
 
 function updateDefaultTip() {
-	const defaultTipContainer = panel.$['defaultTipContainer'];
-	
+	const defaultTipContainer = panel.$["defaultTipContainer"];
+
 	if (!defaultTipContainer || !(defaultTipContainer instanceof HTMLElement)) {
 		return;
 	}
-	
-	defaultTipContainer.innerHTML = '';
-	
-	const level = DEFAULT_TIP.level || 'info';
+
+	clearElementChildren(defaultTipContainer);
+
+	const level = DEFAULT_TIP.level || "info";
 	const levelColors: Record<string, string> = {
-		warn: '#faad14',
-		error: '#ff4d4f'
+		warn: "#faad14",
+		error: "#ff4d4f",
 	};
-	
-	const section = document.createElement('ui-section');
-	section.setAttribute('header', '提示');
-	section.setAttribute('expand', '');
-	
-	if (level !== 'info' && levelColors[level]) {
-		const wrapper = document.createElement('div');
+
+	const section = document.createElement("ui-section");
+	section.setAttribute("header", "提示");
+	section.setAttribute("expand", "");
+
+	if (level !== "info" && levelColors[level]) {
+		const wrapper = document.createElement("div");
 		wrapper.style.borderLeft = `3px solid ${levelColors[level]}`;
-		wrapper.style.paddingLeft = '4px';
-		wrapper.style.marginLeft = '-4px';
-		wrapper.className = 'tip-section';
-		wrapper.setAttribute('data-level', level);
-		
-		const prop = document.createElement('ui-prop');
-		const label = document.createElement('ui-label');
-		
+		wrapper.style.paddingLeft = "4px";
+		wrapper.style.marginLeft = "-4px";
+		wrapper.className = "tip-section";
+		wrapper.setAttribute("data-level", level);
+
+		const prop = document.createElement("ui-prop");
+		const label = document.createElement("ui-label");
+
 		const textNode = document.createTextNode(DEFAULT_TIP.message);
 		label.appendChild(textNode);
-		
+
 		if (DEFAULT_TIP.link) {
-			const link = document.createElement('ui-link');
-			link.setAttribute('tooltip', DEFAULT_TIP.linkText || '查看');
-			link.setAttribute('value', DEFAULT_TIP.link);
-			const icon = document.createElement('ui-icon');
-			icon.setAttribute('value', 'help');
+			const link = document.createElement("ui-link");
+			link.setAttribute("tooltip", DEFAULT_TIP.linkText || "查看");
+			link.setAttribute("value", DEFAULT_TIP.link);
+			const icon = document.createElement("ui-icon");
+			icon.setAttribute("value", "help");
 			link.appendChild(icon);
 			label.appendChild(link);
 		}
-		
+
 		prop.appendChild(label);
 		section.appendChild(prop);
 		wrapper.appendChild(section);
 		defaultTipContainer.appendChild(wrapper);
 	} else {
-		const prop = document.createElement('ui-prop');
-		const label = document.createElement('ui-label');
-		
+		const prop = document.createElement("ui-prop");
+		const label = document.createElement("ui-label");
+
 		const textNode = document.createTextNode(DEFAULT_TIP.message);
 		label.appendChild(textNode);
-		
+
 		if (DEFAULT_TIP.link) {
-			const link = document.createElement('ui-link');
-			link.setAttribute('tooltip', DEFAULT_TIP.linkText || '查看');
-			link.setAttribute('value', DEFAULT_TIP.link);
-			const icon = document.createElement('ui-icon');
-			icon.setAttribute('value', 'help');
+			const link = document.createElement("ui-link");
+			link.setAttribute("tooltip", DEFAULT_TIP.linkText || "查看");
+			link.setAttribute("value", DEFAULT_TIP.link);
+			const icon = document.createElement("ui-icon");
+			icon.setAttribute("value", "help");
 			link.appendChild(icon);
 			label.appendChild(link);
 		}
-		
+
 		prop.appendChild(label);
 		section.appendChild(prop);
 		defaultTipContainer.appendChild(section);
@@ -934,58 +808,57 @@ function updateDefaultTip() {
 function updateChannelTips() {
 	const config = getOptions();
 	const selectedChannels = config.exportChannels || [];
-	const tipsContainer = panel.$['channelTipsContainer'];
-	
+	const tipsContainer = panel.$["channelTipsContainer"];
+
 	if (!tipsContainer || !(tipsContainer instanceof HTMLElement)) {
 		return;
 	}
-	
-	tipsContainer.innerHTML = '';
-	
+
+	clearElementChildren(tipsContainer);
+
 	selectedChannels.forEach((channel) => {
 		const tip = CHANNEL_TIPS[channel];
 		if (!tip) {
 			return;
 		}
-		
-		const level = tip.level || 'info';
+
+		const level = tip.level || "info";
 		const levelColors: Record<string, string> = {
-			warn: '#faad14',
-			error: '#ff4d4f'
+			warn: "#faad14",
+			error: "#ff4d4f",
 		};
-		
-		const section = document.createElement('ui-section');
-		section.setAttribute('header', `${channel} 提示`);
-		section.setAttribute('expand', '');
-		
-	const prop = document.createElement('ui-prop');
-	const label = document.createElement('ui-label');
-	
-	// 支持 HTML 标签（如加粗）
-	const messageSpan = document.createElement('span');
-	messageSpan.innerHTML = tip.message;
-	label.appendChild(messageSpan);
-	
-	if (tip.link) {
-			const link = document.createElement('ui-link');
-			link.setAttribute('tooltip', tip.linkText || '查看详情');
-			link.setAttribute('value', tip.link);
-			const icon = document.createElement('ui-icon');
-			icon.setAttribute('value', 'help');
+
+		const section = document.createElement("ui-section");
+		section.setAttribute("header", `${channel} 提示`);
+		section.setAttribute("expand", "");
+
+		const prop = document.createElement("ui-prop");
+		const label = document.createElement("ui-label");
+
+		const messageSpan = document.createElement("span");
+		appendTipMessage(messageSpan, tip.message);
+		label.appendChild(messageSpan);
+
+		if (tip.link) {
+			const link = document.createElement("ui-link");
+			link.setAttribute("tooltip", tip.linkText || "查看详情");
+			link.setAttribute("value", tip.link);
+			const icon = document.createElement("ui-icon");
+			icon.setAttribute("value", "help");
 			link.appendChild(icon);
 			label.appendChild(link);
 		}
-		
+
 		prop.appendChild(label);
 		section.appendChild(prop);
-		
-		if (level !== 'info' && levelColors[level]) {
-			const wrapper = document.createElement('div');
+
+		if (level !== "info" && levelColors[level]) {
+			const wrapper = document.createElement("div");
 			wrapper.style.borderLeft = `3px solid ${levelColors[level]}`;
-			wrapper.style.paddingLeft = '4px';
-			wrapper.style.marginLeft = '-4px';
-			wrapper.className = 'tip-section';
-			wrapper.setAttribute('data-level', level);
+			wrapper.style.paddingLeft = "4px";
+			wrapper.style.marginLeft = "-4px";
+			wrapper.className = "tip-section";
+			wrapper.setAttribute("data-level", level);
 			wrapper.appendChild(section);
 			tipsContainer.appendChild(wrapper);
 		} else {
@@ -1005,11 +878,19 @@ function removeEmptyValues(obj: any): any {
 	}
 
 	if (Array.isArray(obj)) {
-		const filteredArray = obj.filter((item) => item !== null && item !== undefined && item !== '' && item !== 'undefined');
-		return filteredArray.length > 0 ? filteredArray.map((item) => removeEmptyValues(item)) : undefined;
+		const filteredArray = obj.filter(
+			(item) =>
+				item !== null &&
+				item !== undefined &&
+				item !== "" &&
+				item !== "undefined",
+		);
+		return filteredArray.length > 0
+			? filteredArray.map((item) => removeEmptyValues(item))
+			: undefined;
 	}
 
-	if (typeof obj === 'object') {
+	if (typeof obj === "object") {
 		const result: any = {};
 		let hasValidValues = false;
 
@@ -1025,8 +906,8 @@ function removeEmptyValues(obj: any): any {
 	}
 
 	// 处理字符串类型
-	if (typeof obj === 'string') {
-		return obj === '' || obj === 'undefined' ? undefined : obj;
+	if (typeof obj === "string") {
+		return obj === "" || obj === "undefined" ? undefined : obj;
 	}
 
 	return obj;
@@ -1049,11 +930,14 @@ async function saveConfigToFile(config: TAdapterRC) {
 		JSON.parse(configStr);
 
 		// 完整替换文件内容
-		await promises.writeFile(configPath, configStr, { encoding: 'utf8', flag: 'w' });
+		await promises.writeFile(configPath, configStr, {
+			encoding: "utf8",
+			flag: "w",
+		});
 		logger.log(`配置已保存到 ${configPath}`);
 	} catch (err) {
-		logger.error('保存配置失败:', err);
-		throw new Error('配置格式无效，无法保存');
+		logger.error("保存配置失败:", err);
+		throw new Error("配置格式无效，无法保存");
 	}
 }
 
@@ -1071,21 +955,24 @@ function getOptions() {
  */
 function setOptions(options: TAdapterRC) {
 	panel.options.packages[PACKAGE_NAME] = options;
-	panel.dispatch('update', `packages.${PACKAGE_NAME}`, options);
+	panel.dispatch("update", `packages.${PACKAGE_NAME}`, options);
 }
 
 /**
  * 创建默认的注入选项
  */
 function createDefaultInjectOptions(): Record<TChannel, TChannelRC> {
-	return CHANNEL_OPTIONS.reduce((acc, channel) => {
-		acc[channel] = {
-			head: '',
-			body: '',
-			sdkScript: ''
-		};
-		return acc;
-	}, {} as Record<TChannel, TChannelRC>);
+	return CHANNEL_OPTIONS.reduce(
+		(acc, channel) => {
+			acc[channel] = {
+				head: "",
+				body: "",
+				sdkScript: "",
+			};
+			return acc;
+		},
+		{} as Record<TChannel, TChannelRC>,
+	);
 }
 
 /**
@@ -1097,17 +984,19 @@ function createDefaultConfig(): TAdapterRC {
 		orientation: CONFIG.DEFAULT_ORIENTATION,
 		exportChannels: [],
 		injectOptions: createDefaultInjectOptions(),
-		fileName: '',
-		lang: '',
-		title: '',
-		iosUrl: '',
-		androidUrl: '',
-		tinify: false,
-		tinifyApiKey: '',
-		tinifySkipUuids: [],
+		fileName: "",
+		lang: "",
+		title: "",
+		iosUrl: "",
+		androidUrl: "",
+		compress: {
+			enable: false,
+			quality: DEFAULT_COMPRESS_QUALITY,
+			skipUuids: [],
+		},
 		enableSplash: false,
 		skipBuild: false,
-		isZip: false
+		isZip: false,
 	};
 }
 
@@ -1143,30 +1032,36 @@ const handleCreateConfigClick = async () => {
 		await applyConfig(defaultConfig);
 
 		// 完整替换文件内容
-		await promises.writeFile(configPath, JSON.stringify(defaultConfig, null, 2), { encoding: 'utf8', flag: 'w' });
-		logger.log('成功创建并保存默认配置');
+		await promises.writeFile(
+			configPath,
+			JSON.stringify(defaultConfig, null, 2),
+			{ encoding: "utf8", flag: "w" },
+		);
+		logger.log("成功创建并保存默认配置");
 	} catch (err: any) {
-		logger.error('创建配置文件失败:', err.message);
+		logger.error("创建配置文件失败:", err.message);
 	}
 };
 
 function showConfigPanel() {
 	// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查元素是否存在
-	getStyle(IDS.NO_CONFIG_TIP).display = 'none';
-	getStyle(IDS.CONFIG_PANEL).display = '';
-	getStyle(IDS.CONFIG_BUTTONS).display = '';
-	getStyle(IDS.CREATE_BUTTONS).display = 'none';
+	getStyle(IDS.NO_CONFIG_TIP).display = "none";
+	getStyle(IDS.CONFIG_PANEL).display = "";
+	getStyle(IDS.CONFIG_BUTTONS).display = "";
+	getStyle(IDS.CREATE_BUTTONS).display = "none";
 }
 
 function hideConfigPanel() {
-	getStyle(IDS.NO_CONFIG_TIP).display = '';
-	getStyle(IDS.CONFIG_PANEL).display = 'none';
-	getStyle(IDS.CONFIG_BUTTONS).display = 'none';
-	getStyle(IDS.CREATE_BUTTONS).display = '';
+	getStyle(IDS.NO_CONFIG_TIP).display = "";
+	getStyle(IDS.CONFIG_PANEL).display = "none";
+	getStyle(IDS.CONFIG_BUTTONS).display = "none";
+	getStyle(IDS.CREATE_BUTTONS).display = "";
 }
 
 // 抽取公共的文件操作函数
-async function handleFileOperation(operation: 'import' | 'export'): Promise<void> {
+async function handleFileOperation(
+	operation: "import" | "export",
+): Promise<void> {
 	const dialogConfig = getDialogConfig(operation);
 	const result = await Editor.Dialog.select(dialogConfig);
 
@@ -1176,27 +1071,32 @@ async function handleFileOperation(operation: 'import' | 'export'): Promise<void
 
 	try {
 		await processFileOperation(operation, result.filePaths[0]);
-		logger.log(`配置已成功${operation === 'import' ? '导入' : '导出'}`);
+		logger.log(`配置已成功${operation === "import" ? "导入" : "导出"}`);
 	} catch (err: any) {
-		logger.error(`配置${operation === 'import' ? '导入' : '导出'}失败: ${err.message}`);
+		logger.error(
+			`配置${operation === "import" ? "导入" : "导出"}失败: ${err.message}`,
+		);
 	}
 }
 
-function getDialogConfig(operation: 'import' | 'export') {
-	return operation === 'import'
+function getDialogConfig(operation: "import" | "export") {
+	return operation === "import"
 		? {
-			title: '选择配置文件',
-			type: 'file' as const,
-			filters: [{ name: 'JSON', extensions: ['json'] }]
-		}
+				title: "选择配置文件",
+				type: "file" as const,
+				filters: [{ name: "JSON", extensions: ["json"] }],
+			}
 		: {
-			title: '选择导出目录',
-			type: 'directory' as const
-		};
+				title: "选择导出目录",
+				type: "directory" as const,
+			};
 }
 
-async function processFileOperation(operation: 'import' | 'export', filePath: string) {
-	if (operation === 'import') {
+async function processFileOperation(
+	operation: "import" | "export",
+	filePath: string,
+) {
+	if (operation === "import") {
 		await handleImport(filePath);
 	} else {
 		await handleExport(filePath);
@@ -1212,13 +1112,13 @@ async function handleImport(filePath: string) {
 		}
 
 		// 读取源文件内容
-		const content = await promises.readFile(filePath, 'utf8');
+		const content = await promises.readFile(filePath, "utf8");
 		let config: TAdapterRC;
 
 		try {
 			config = JSON.parse(content);
 		} catch (err) {
-			logger.error('配置文件格式无效，请确保是有效的 JSON 格式');
+			logger.error("配置文件格式无效，请确保是有效的 JSON 格式");
 			return;
 		}
 
@@ -1241,7 +1141,10 @@ async function handleExport(dirPath: string) {
 		const configStr = JSON.stringify(config, null, 2);
 
 		// 完整替换文件内容
-		await promises.writeFile(exportPath, configStr, { encoding: 'utf8', flag: 'w' });
+		await promises.writeFile(exportPath, configStr, {
+			encoding: "utf8",
+			flag: "w",
+		});
 		logger.log(`配置已导出到 ${exportPath}`);
 	} catch (err: any) {
 		logger.error(`导出配置失败: ${err.message}`);
@@ -1251,18 +1154,35 @@ async function handleExport(dirPath: string) {
 // 定义事件处理函数
 const handleOpenBuildFolderClick = () => handleOpenBuildFolder();
 const handleOpenConfigClick = () => handleOpenConfig();
-const handleImportClick = () => handleFileOperation('import');
-const handleExportClick = () => handleFileOperation('export');
-const handleImportCreateClick = () => handleFileOperation('import');
+const handleImportClick = () => handleFileOperation("import");
+const handleExportClick = () => handleFileOperation("export");
+const handleImportCreateClick = () => handleFileOperation("import");
 const handleBuildClick = () => handleBuild();
+const handleCancelBuildClick = () => handleCancelBuild();
 function initConfigPanelButtons() {
 	// 由于 initPanelElements 已确保所有元素都不为空，可以直接添加事件监听器
 	// 配置面板上的按钮
-	panel.$[IDS.OPEN_BUILD_FOLDER].addEventListener(EVENT_TYPES.CLICK, handleOpenBuildFolderClick);
-	panel.$[IDS.OPEN_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleOpenConfigClick);
-	panel.$[IDS.IMPORT_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleImportClick);
-	panel.$[IDS.EXPORT_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleExportClick);
+	panel.$[IDS.OPEN_BUILD_FOLDER].addEventListener(
+		EVENT_TYPES.CLICK,
+		handleOpenBuildFolderClick,
+	);
+	panel.$[IDS.OPEN_CONFIG].addEventListener(
+		EVENT_TYPES.CLICK,
+		handleOpenConfigClick,
+	);
+	panel.$[IDS.IMPORT_CONFIG].addEventListener(
+		EVENT_TYPES.CLICK,
+		handleImportClick,
+	);
+	panel.$[IDS.EXPORT_CONFIG].addEventListener(
+		EVENT_TYPES.CLICK,
+		handleExportClick,
+	);
 	panel.$[IDS.BUILD].addEventListener(EVENT_TYPES.CLICK, handleBuildClick);
+	panel.$[IDS.CANCEL_BUILD]?.addEventListener(
+		EVENT_TYPES.CLICK,
+		handleCancelBuildClick,
+	);
 }
 
 /**
@@ -1271,22 +1191,36 @@ function initConfigPanelButtons() {
 function initCreatePanelButtons() {
 	// 由于 initPanelElements 已确保所有元素都不为空，不再需要检查元素是否存在
 	// 创建面板上的导入配置按钮
-	panel.$[IDS.IMPORT_CONFIG_CREATE].addEventListener(EVENT_TYPES.CLICK, handleImportCreateClick);
-	panel.$[IDS.CREATE_CONFIG].addEventListener(EVENT_TYPES.CLICK, handleCreateConfigClick);
+	panel.$[IDS.IMPORT_CONFIG_CREATE].addEventListener(
+		EVENT_TYPES.CLICK,
+		handleImportCreateClick,
+	);
+	panel.$[IDS.CREATE_CONFIG].addEventListener(
+		EVENT_TYPES.CLICK,
+		handleCreateConfigClick,
+	);
 
 	// 确保配置面板按钮不可见
 
-	getStyle(IDS.CONFIG_BUTTONS).display = 'none';
+	getStyle(IDS.CONFIG_BUTTONS).display = "none";
 
 	// 确保创建面板按钮可见
-	getStyle(IDS.CREATE_BUTTONS).display = '';
+	getStyle(IDS.CREATE_BUTTONS).display = "";
 }
 
 function handleBuild() {
 	if (isBuilding) {
 		return;
 	}
-	Editor.Message.send(PACKAGE_NAME, 'adapter-build');
+	Editor.Message.send(PACKAGE_NAME, "adapter-build");
+}
+
+function handleCancelBuild() {
+	if (!isBuilding) {
+		return;
+	}
+	logger.warn("请求停止构建...");
+	Editor.Message.send(PACKAGE_NAME, "cancel-build");
 }
 
 /**
@@ -1346,10 +1280,10 @@ function getStyle(selector: string): CSSStyleDeclaration {
 // 添加读取商店配置的函数
 async function readStoreConfig(storePath: string): Promise<TStoreConfig> {
 	try {
-		const content = await promises.readFile(storePath, 'utf8');
+		const content = await promises.readFile(storePath, "utf8");
 		return JSON.parse(content);
 	} catch (err) {
-		logger.error('读取商店配置失败:', err);
+		logger.error("读取商店配置失败:", err);
 		return [];
 	}
 }
@@ -1358,80 +1292,80 @@ async function readStoreConfig(storePath: string): Promise<TStoreConfig> {
 function createStoreSection(storeConfig: TStoreConfig) {
 	const container = panel.$[IDS.STORE_CONTAINER];
 	if (!container || !(container instanceof HTMLElement)) {
-		logger.error('商店配置容器无效或不是 HTMLElement');
+		logger.error("商店配置容器无效或不是 HTMLElement");
 		return;
 	}
 
 	// 获取 ui-file 元素
-	const storePathElement = panel.$['storePath'];
+	const storePathElement = panel.$["storePath"];
 	if (!storePathElement || !(storePathElement instanceof HTMLElement)) {
-		logger.error('商店配置路径输入框无效或不是 HTMLElement');
+		logger.error("商店配置路径输入框无效或不是 HTMLElement");
 		return;
 	}
 
 	// 清除除了 ui-file 以外的所有内容
 	Array.from(container.children).forEach((child) => {
-		if (child !== storePathElement && child.id !== 'storePath') {
+		if (child !== storePathElement && child.id !== "storePath") {
 			container.removeChild(child);
 		}
 	});
 
 	// 如果没有配置，直接返回
 	if (!Array.isArray(storeConfig) || storeConfig.length === 0) {
-		logger.log('没有商店配置数据');
+		logger.log("没有商店配置数据");
 		return;
 	}
 
 	try {
 		storeConfig.forEach((store) => {
-			if (!store || typeof store !== 'object') {
-				logger.warn('无效的商店配置项:', store);
+			if (!store || typeof store !== "object") {
+				logger.warn("无效的商店配置项:", store);
 				return;
 			}
 
 			// 创建商店配置组
-			const storeSection = document.createElement('ui-section');
-			storeSection.setAttribute('header', store.name || '未命名商店');
+			const storeSection = document.createElement("ui-section");
+			storeSection.setAttribute("header", store.name || "未命名商店");
 
 			// 创建iOS URL部分
-			const iosProps = document.createElement('ui-prop');
-			const iosLabel = document.createElement('ui-label');
-			iosLabel.setAttribute('slot', 'label');
-			iosLabel.setAttribute('value', 'iOS URL');
-			const iosInput = document.createElement('ui-input');
-			iosInput.setAttribute('slot', 'content');
-			iosInput.setAttribute('value', store.ios || '');
-			iosInput.setAttribute('readonly', '');
+			const iosProps = document.createElement("ui-prop");
+			const iosLabel = document.createElement("ui-label");
+			iosLabel.setAttribute("slot", "label");
+			iosLabel.setAttribute("value", "iOS URL");
+			const iosInput = document.createElement("ui-input");
+			iosInput.setAttribute("slot", "content");
+			iosInput.setAttribute("value", store.ios || "");
+			iosInput.setAttribute("readonly", "");
 			iosProps.appendChild(iosLabel);
 			iosProps.appendChild(iosInput);
 			storeSection.appendChild(iosProps);
 
 			// 创建Android URL部分
-			const androidProps = document.createElement('ui-prop');
-			const androidLabel = document.createElement('ui-label');
-			androidLabel.setAttribute('slot', 'label');
-			androidLabel.setAttribute('value', 'Android URL');
-			const androidInput = document.createElement('ui-input');
-			androidInput.setAttribute('slot', 'content');
-			androidInput.setAttribute('value', store.android || '');
-			androidInput.setAttribute('readonly', '');
+			const androidProps = document.createElement("ui-prop");
+			const androidLabel = document.createElement("ui-label");
+			androidLabel.setAttribute("slot", "label");
+			androidLabel.setAttribute("value", "Android URL");
+			const androidInput = document.createElement("ui-input");
+			androidInput.setAttribute("slot", "content");
+			androidInput.setAttribute("value", store.android || "");
+			androidInput.setAttribute("readonly", "");
 			androidProps.appendChild(androidLabel);
 			androidProps.appendChild(androidInput);
 			storeSection.appendChild(androidProps);
 
 			// 创建应用按钮容器
-			const buttonContainer = document.createElement('div');
-			buttonContainer.style.textAlign = 'right';
-			buttonContainer.style.marginTop = '4px';
+			const buttonContainer = document.createElement("div");
+			buttonContainer.style.textAlign = "right";
+			buttonContainer.style.marginTop = "4px";
 
 			// 创建应用按钮
-			const applyButton = document.createElement('ui-button');
-			applyButton.textContent = '应用';
+			const applyButton = document.createElement("ui-button");
+			applyButton.textContent = "应用";
 			applyButton.addEventListener(EVENT_TYPES.CLICK, async () => {
 				const options = getOptions();
-				options.iosUrl = store.ios || '';
-				options.androidUrl = store.android || '';
-				panel.dispatch('update', `packages.${PACKAGE_NAME}`, options);
+				options.iosUrl = store.ios || "";
+				options.androidUrl = store.android || "";
+				panel.dispatch("update", `packages.${PACKAGE_NAME}`, options);
 			});
 
 			buttonContainer.appendChild(applyButton);
@@ -1440,6 +1374,6 @@ function createStoreSection(storeConfig: TStoreConfig) {
 			container.appendChild(storeSection);
 		});
 	} catch (err) {
-		logger.error('创建商店配置区域时出错:', err);
+		logger.error("创建商店配置区域时出错:", err);
 	}
 }

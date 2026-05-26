@@ -1,5 +1,5 @@
 import { mountGlobalVars, unmountGlobalVars } from "@/global";
-import { execTinify } from "@/helpers/tinify";
+import { execCompress } from "@/helpers/compress";
 import { genSingleFile } from '@/merger';
 import { genChannelsPkg } from '@/packager';
 import { TMode } from "@/packager/base";
@@ -16,7 +16,7 @@ export const execAdapter = async (options: TOptions, config?: { mode: TMode; }) 
   try {
     try {
       console.log('【执行图片压缩】');
-      const { success, msg } = await execTinify();
+      const { success, msg } = await execCompress();
       if (!success) {
         console.warn(msg);
       } else {
