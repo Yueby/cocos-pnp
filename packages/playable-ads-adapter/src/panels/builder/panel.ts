@@ -1,5 +1,5 @@
 import { shell } from "electron";
-import { existsSync, promises } from "fs";
+import { existsSync, promises, rmSync } from "fs";
 
 import { ADAPTER_RC_PATH } from "../../extensions/constants";
 import { readAdapterRCFileForPanel } from "../../extensions/utils/file-system/adapterrc";
@@ -1152,7 +1152,8 @@ async function handleExport(dirPath: string) {
 }
 
 // 定义事件处理函数
-const handleOpenBuildFolderClick = () => handleOpenBuildFolder();
+const handleBuildFolderMenuClick = (event: MouseEvent) =>
+	handleBuildFolderMenu(event);
 const handleOpenConfigClick = () => handleOpenConfig();
 const handleImportClick = () => handleFileOperation("import");
 const handleExportClick = () => handleFileOperation("export");
@@ -1162,9 +1163,9 @@ const handleCancelBuildClick = () => handleCancelBuild();
 function initConfigPanelButtons() {
 	// 由于 initPanelElements 已确保所有元素都不为空，可以直接添加事件监听器
 	// 配置面板上的按钮
-	panel.$[IDS.OPEN_BUILD_FOLDER].addEventListener(
+	panel.$[IDS.BUILD_FOLDER_MENU].addEventListener(
 		EVENT_TYPES.CLICK,
-		handleOpenBuildFolderClick,
+		handleBuildFolderMenuClick,
 	);
 	panel.$[IDS.OPEN_CONFIG].addEventListener(
 		EVENT_TYPES.CLICK,
@@ -1221,6 +1222,68 @@ function handleCancelBuild() {
 	}
 	logger.warn("请求停止构建...");
 	Editor.Message.send(PACKAGE_NAME, "cancel-build");
+}
+
+function handleBuildFolderMenu(event: MouseEvent) {
+	Editor.Menu.popup({
+		x: event.clientX,
+		y: event.clientY,
+		menu: [
+			{
+				label: "打开构建文件夹",
+				click: () => {
+					handleOpenBuildFolder();
+				},
+			},
+			{
+				label: "清理构建文件",
+				click: () => {
+					handleCleanBuildFolder();
+				},
+			},
+		],
+	});
+}
+
+async function handleCleanBuildFolder() {
+	if (isBuilding) {
+		logger.warn("构建进行中，不能清理构建文件");
+		return;
+	}
+
+	const projectPath = Editor.Project.path;
+	const buildPath = `${projectPath}/build`;
+
+	if (!existsSync(buildPath)) {
+		logger.warn(`构建文件夹不存在: ${buildPath}`);
+		return;
+	}
+
+	try {
+		const result = await Editor.Dialog.warn(
+			"确定要清理 build 目录下的所有文件吗？",
+			{
+				title: "清理构建文件",
+				detail: buildPath,
+				buttons: ["取消", "清理"],
+				default: 0,
+				cancel: 0,
+			},
+		);
+		if (result.response !== 1) {
+			return;
+		}
+
+		const entries = await promises.readdir(buildPath);
+		for (const entry of entries) {
+			rmSync(`${buildPath}/${entry}`, { recursive: true, force: true });
+		}
+		logger.log(`已清理构建文件夹: ${buildPath}`);
+	} catch (error) {
+		logger.error(
+			`清理构建文件夹失败: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
 }
 
 /**

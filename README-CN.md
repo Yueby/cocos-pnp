@@ -192,59 +192,26 @@ window.advChannels = 'Facebook';
 pnpm install
 ```
 
-### 本机 Cocos 扩展目录
+### 构建产物
 
-`pnpm build` 和 `pnpm watch` 可以选择性地把构建后的扩展复制到本机 Cocos Creator 扩展目录。
+`pnpm run build` 现在默认生成当前平台对应的扩展 zip。请使用 zip 进行本机测试、同事分发和 Cocos Creator 安装。
 
-从 `.env.example` 复制一份本地 `.env`：
-
-```env
-COCOS_EXTENSION_DEST=
-```
-
-将 `COCOS_EXTENSION_DEST` 设置为父级 `extensions` 目录：
-
-```env
-COCOS_EXTENSION_DEST=/path/to/CocosCreator/extensions
-```
-
-构建后会复制到：
-
-```text
-${COCOS_EXTENSION_DEST}/playable-ads-adapter
-```
-
-如果 `COCOS_EXTENSION_DEST` 为空或不存在，则只构建到：
-
-```text
-packages/playable-ads-adapter/dist/playable-ads-adapter
-```
-
-`.env` 已被 git 忽略。提交 `.env.example`，不要提交 `.env`。
+`packages/playable-ads-adapter/dist/playable-ads-adapter` 下的原始扩展目录只是中间构建产物，打包后可能会被删除。不要直接从原始 build 文件夹安装扩展。
 
 ### 脚本
 
 ```bash
-# 只构建 core
-pnpm run build:core
-
-# 构建扩展。adapter 包会先构建 core。
+# 构建并生成当前平台对应的 zip 包
 pnpm run build
 
-# watch 构建扩展。设置 COCOS_EXTENSION_DEST 时会同步复制。
-pnpm run watch
-
-# 构建并生成当前平台对应的 zip 包
-pnpm run package
-
 # 构建 Windows x64 zip 包
-pnpm run package:win
+pnpm run build:win
 
 # 构建 macOS x64 zip 包
-pnpm run package:mac
+pnpm run build:mac
 
 # 构建全部支持的 zip 包
-pnpm run package:all
+pnpm run build:all
 ```
 
 ## 发布
@@ -259,7 +226,7 @@ playable-ads-adapter-*
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run package
+pnpm run build
 ```
 
 打包后的 zip 已包含扩展运行时代码、`adapter-runner.js`、`sharp-worker.js` 和对应平台的 sharp native 运行时。除非明确要替换依赖，否则不要在解压后的扩展目录里执行 `npm install`。

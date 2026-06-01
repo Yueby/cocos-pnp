@@ -6,13 +6,10 @@
   "scripts": {
     "commit": "cz",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:core": "pnpm -F playable-adapter-core build",
-    "build": "pnpm -F playable-ads-adapter build",
-    "watch": "pnpm -F playable-ads-adapter watch",
-    "package": "node scripts/package-playable.js",
-    "package:win": "node scripts/package-playable.js --platform=win32",
-    "package:mac": "node scripts/package-playable.js --platform=darwin",
-    "package:all": "pnpm run package:win && pnpm run package:mac"
+    "build": "node scripts/package-playable.js",
+    "build:win": "node scripts/package-playable.js --platform=win32",
+    "build:mac": "node scripts/package-playable.js --platform=darwin",
+    "build:all": "pnpm run build:win && pnpm run build:mac"
   },
   "repository": {
     "type": "git",

@@ -154,7 +154,7 @@ async function main() {
 	console.log(`目标平台: ${platform}-${arch}`);
 	console.log(`插件版本: v${PLUGIN_VERSION}`);
 
-	await run("pnpm", ["run", "build"]);
+	await run("pnpm", ["-F", "playable-ads-adapter", "build:raw"]);
 
 	if (!fs.existsSync(PLUGIN_BUILD_DIR)) {
 		throw new Error(`未找到构建产物：${PLUGIN_BUILD_DIR}`);

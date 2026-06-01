@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "name": "playable-ads-adapter",
   "description": "i18n:playable-ads-adapter.description",
   "main": "./main.js",
@@ -24,8 +24,8 @@
   "scripts": {
     "clear": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "watch": "pnpm -F playable-adapter-core build && pnpm clear && rollup -c -w",
-    "build": "pnpm -F playable-adapter-core build && pnpm clear && rollup -c",
-    "package": "node ../../scripts/package-playable.js"
+    "build:raw": "pnpm -F playable-adapter-core build && pnpm clear && rollup -c",
+    "build": "node ../../scripts/package-playable.js"
   },
   "dependencies": {
     "cheerio": "1.0.0-rc.12",

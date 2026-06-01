@@ -72,7 +72,7 @@ export const IDS = {
 	CREATE_BUTTONS: "createButtons",
 	NO_CONFIG_TIP: "noConfigTip",
 	CONFIG_PANEL: "configPanel",
-	OPEN_BUILD_FOLDER: "openBuildFolder",
+	BUILD_FOLDER_MENU: "buildFolderMenu",
 	OPEN_CONFIG: "openConfig",
 	IMPORT_CONFIG: "importConfig",
 	EXPORT_CONFIG: "exportConfig",
@@ -197,7 +197,7 @@ export const TEMPLATE = `
         </div>
     </div>
     <div id="${IDS.CONFIG_BUTTONS}" style="text-align: right; margin-bottom: 12px; display: none;">
-        <ui-button id="${IDS.OPEN_BUILD_FOLDER}">打开构建文件夹</ui-button>
+        <ui-button id="${IDS.BUILD_FOLDER_MENU}" tooltip="构建文件夹操作">构建文件 <ui-icon value="menu"></ui-icon></ui-button>
         <ui-button id="${IDS.OPEN_CONFIG}">打开配置</ui-button>
         <ui-button id="${IDS.IMPORT_CONFIG}">导入配置</ui-button>
         <ui-button id="${IDS.EXPORT_CONFIG}">导出配置</ui-button>
@@ -339,7 +339,7 @@ export const SELECTORS: TPanelSelector<TAdapterRCKeysExcluded> = {
 	[IDS.CREATE_BUTTONS]: `#${IDS.CREATE_BUTTONS}`,
 	[IDS.NO_CONFIG_TIP]: `#${IDS.NO_CONFIG_TIP}`,
 	[IDS.CONFIG_PANEL]: `#${IDS.CONFIG_PANEL}`,
-	[IDS.OPEN_BUILD_FOLDER]: `#${IDS.OPEN_BUILD_FOLDER}`,
+	[IDS.BUILD_FOLDER_MENU]: `#${IDS.BUILD_FOLDER_MENU}`,
 	[IDS.OPEN_CONFIG]: `#${IDS.OPEN_CONFIG}`,
 	[IDS.IMPORT_CONFIG]: `#${IDS.IMPORT_CONFIG}`,
 	[IDS.EXPORT_CONFIG]: `#${IDS.EXPORT_CONFIG}`,

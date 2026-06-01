@@ -31,23 +31,17 @@
 常用根目录脚本：
 
 ```text
-pnpm run build:core
 pnpm run build
-pnpm run watch
-pnpm run package
-pnpm run package:win
-pnpm run package:mac
-pnpm run package:all
+pnpm run build:win
+pnpm run build:mac
+pnpm run build:all
 ```
 
 脚本关系：
 
-- `build:core`：构建 `playable-adapter-core`。
-- `build`：构建 core 和扩展产物。
-- `watch`：进入扩展层对应 watch 流程。
-- `package`：按当前平台生成扩展 zip，当前仅支持 `win32-x64` / `darwin-x64`。
-- `package:win` / `package:mac`：分别生成 Windows / macOS x64 包。
-- `package:all`：依次生成 Windows / macOS x64 包。
+- `build`：构建 core、扩展产物并生成当前平台扩展 zip；默认不要再直接使用原始 build 文件夹安装扩展。
+- `build:win` / `build:mac`：分别生成 Windows / macOS x64 包。
+- `build:all`：依次生成 Windows / macOS x64 包。
 
 ## Cocos 版本定位
 
@@ -230,4 +224,4 @@ packages/playable-adapter-core/src/channels/<channel>/
 - 除非任务明确要求，不要跨 package 同时改动 core 和 extension。
 - 涉及面板 UI 的改动应优先检查当前 Cocos Creator 3.8.x+ 扩展入口。
 - 涉及渠道集合的改动必须同步类型、聚合导出和 packager 映射。
-- 涉及构建输出、压缩、HTML 注入、渠道导出的改动，应运行相关 build/package 或至少说明未验证的原因；用户需要 zip 时优先运行 `pnpm run package`。
+- 涉及构建输出、压缩、HTML 注入、渠道导出的改动，应运行相关 build 或至少说明未验证的原因；用户需要 zip 时运行 `pnpm run build`。

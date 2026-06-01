@@ -78,7 +78,7 @@ Download the packaged extension from releases:
 
 [https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true](https://github.com/ppgee/cocos-pnp/releases?q=playable-ads-adapter&expanded=true)
 
-Choose the zip that matches your host platform. Current package scripts generate platform-specific x64 packages:
+Choose the zip that matches your host platform. Current build scripts generate platform-specific x64 packages:
 
 - `playable-ads-adapter-v<version>-win32-x64.zip`
 - `playable-ads-adapter-v<version>-darwin-x64.zip`
@@ -194,59 +194,26 @@ Install dependencies:
 pnpm install
 ```
 
-### Local Cocos Extension Destination
+### Build Artifacts
 
-`pnpm build` and `pnpm watch` can optionally copy the built extension into your local Cocos Creator extensions directory.
+`pnpm run build` now creates a platform-specific extension zip by default. Use the zip for local testing, sharing with teammates, and installation in Cocos Creator.
 
-Create a local `.env` from `.env.example`:
-
-```env
-COCOS_EXTENSION_DEST=
-```
-
-Set `COCOS_EXTENSION_DEST` to the parent `extensions` directory:
-
-```env
-COCOS_EXTENSION_DEST=/path/to/CocosCreator/extensions
-```
-
-The extension is copied to:
-
-```text
-${COCOS_EXTENSION_DEST}/playable-ads-adapter
-```
-
-If `COCOS_EXTENSION_DEST` is empty or missing, the build only writes to:
-
-```text
-packages/playable-ads-adapter/dist/playable-ads-adapter
-```
-
-`.env` is ignored by git. Commit `.env.example`, not `.env`.
+Raw extension folders under `packages/playable-ads-adapter/dist/playable-ads-adapter` are intermediate build artifacts and may be deleted after packaging. Do not install from the raw build folder.
 
 ### Scripts
 
 ```bash
-# Build core only
-pnpm run build:core
-
-# Build the extension. The adapter package builds core first.
+# Build and create current-platform release zip
 pnpm run build
 
-# Watch extension build. Also uses COCOS_EXTENSION_DEST when set.
-pnpm run watch
-
-# Build and create current-platform release zip
-pnpm run package
-
 # Build Windows x64 release zip
-pnpm run package:win
+pnpm run build:win
 
 # Build macOS x64 release zip
-pnpm run package:mac
+pnpm run build:mac
 
 # Build all supported release zips
-pnpm run package:all
+pnpm run build:all
 ```
 
 ## Release
@@ -261,7 +228,7 @@ It runs:
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run package
+pnpm run build
 ```
 
 Packaged zips include the extension runtime, `adapter-runner.js`, `sharp-worker.js`, and the platform-specific sharp native runtime. Do not run `npm install` inside an extracted extension unless you intentionally want to replace bundled dependencies.

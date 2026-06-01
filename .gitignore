@@ -7,3 +7,4 @@ dist/
 /.tmp-asar-builder
 .tmp-*.log
 progress.md
+/.sharp-tmp
