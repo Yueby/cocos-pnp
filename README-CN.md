@@ -116,7 +116,7 @@ Cocos Creator 3.8.x+ 编辑器扩展。提供构建面板、构建 hooks、外�
   "enableSplash": true,
   "isZip": true,
   "compress": {
-    "enable": false,
+    "enable": true,
     "quality": 60,
     "skipUuids": [],
     "concurrency": 8
@@ -144,7 +144,7 @@ Cocos Creator 3.8.x+ 编辑器扩展。提供构建面板、构建 hooks、外�
 | `exportChannels` | 指定导出渠道。为空或不填时导出全部渠道。 |
 | `enableSplash` | 是否处理启动图。 |
 | `isZip` | 是否启用 Pako 资源压缩。 |
-| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | 本地 sharp 图片压缩配置。`quality` 默认 `60`，试玩广告常用 `50-70`。 |
+| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | 本地 sharp 图片压缩配置。图片压缩默认开启；`quality` 默认 `60`，试玩广告常用 `50-70`。 |
 | `injectOptions` | 按渠道注入 `head`、`body`、`sdkScript`。 |
 
 ## 运行时 `Playable` 工具类

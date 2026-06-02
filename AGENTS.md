@@ -197,7 +197,7 @@ packages/playable-adapter-core/src/channels/<channel>/
 | `exportChannels` | 指定导出渠道；为空或不填时默认导出全部渠道 |
 | `enableSplash` | 是否启用启动图处理 |
 | `injectOptions` | 按渠道注入 `head`、`body`、`sdkScript` |
-| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | 本地 sharp 图片压缩相关配置；`quality` 默认 60，常用 50-70 |
+| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | 本地 sharp 图片压缩相关配置；默认开启，`quality` 默认 60，常用 50-70 |
 | `isZip` | 是否启用 Pako 资源压缩 |
 
 配置相关改动要同时考虑：
@@ -214,7 +214,7 @@ packages/playable-adapter-core/src/channels/<channel>/
 - 动态渠道名占位符 `{{__adv_channels_adapter__}}`。
 - 新增 Bigo、SnapChat、Yandex 渠道支持。
 - 优化 MRAID SDK 集成和平台生命周期管理。
-- 本地 sharp 图片压缩与 Pako 资源压缩；图片压缩默认质量为 60，优先通过外部 Node 子进程执行。
+- 本地 sharp 图片压缩与 Pako 资源压缩；图片压缩默认开启，默认质量为 60，优先通过外部 Node 子进程执行。
 - 全局 `Playable` 工具类，用于渠道判断、语言读取、SDK ready、广告展示、游戏结束、重玩和暂停逻辑。
 
 ## 开发原则

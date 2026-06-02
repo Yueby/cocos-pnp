@@ -298,7 +298,7 @@ type TCompressFormState = {
 
 function ensureCompressConfig(config: TAdapterRC): TCompressFormState {
 	const normalized: TCompressFormState = {
-		enable: !!config.compress?.enable,
+		enable: config.compress?.enable ?? true,
 		quality: normalizeQuality(
 			config.compress?.quality ?? DEFAULT_COMPRESS_QUALITY,
 		),
@@ -990,7 +990,7 @@ function createDefaultConfig(): TAdapterRC {
 		iosUrl: "",
 		androidUrl: "",
 		compress: {
-			enable: false,
+			enable: true,
 			quality: DEFAULT_COMPRESS_QUALITY,
 			skipUuids: [],
 		},

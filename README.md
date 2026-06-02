@@ -118,7 +118,7 @@ The panel reads and writes `.adapterrc.json` in the Cocos project root. Legacy `
   "enableSplash": true,
   "isZip": true,
   "compress": {
-    "enable": false,
+    "enable": true,
     "quality": 60,
     "skipUuids": [],
     "concurrency": 8
@@ -146,7 +146,7 @@ Important fields:
 | `exportChannels` | Channels to export. Empty or omitted means all channels. |
 | `enableSplash` | Whether to process the splash screen. |
 | `isZip` | Whether to use Pako resource compression. |
-| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | Local sharp compression options. `quality` defaults to `60`; `50-70` is usually a good playable-ad range. |
+| `compress.enable` / `compress.quality` / `compress.skipUuids` / `compress.concurrency` | Local sharp compression options. Image compression is enabled by default; `quality` defaults to `60`; `50-70` is usually a good playable-ad range. |
 | `injectOptions` | Channel-specific script injection for `head`, `body`, and `sdkScript`. |
 
 ## Runtime `Playable` Utility

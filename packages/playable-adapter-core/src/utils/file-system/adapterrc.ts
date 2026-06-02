@@ -44,7 +44,7 @@ export const getRCCompress = (): {
 	const adapterRCJson = getAdapterRCJson();
 	if (!adapterRCJson) {
 		return {
-			enable: false,
+			enable: true,
 			quality: 60,
 			skipUuids: [],
 			concurrency: require("os").cpus().length,
@@ -52,7 +52,7 @@ export const getRCCompress = (): {
 	}
 
 	return {
-		enable: !!adapterRCJson?.compress?.enable,
+		enable: adapterRCJson?.compress?.enable ?? true,
 		quality: adapterRCJson?.compress?.quality ?? 60,
 		skipUuids: adapterRCJson?.compress?.skipUuids ?? [],
 		concurrency:
