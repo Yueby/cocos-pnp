@@ -72,6 +72,18 @@ const ADAPTER_RUNNER_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const BUILD_PROCESS_TIMEOUT_MS = 30 * 60 * 1000;
 const BUILD_PROCESS_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const BUILD_SUCCESS_EXIT_CODES = new Set([0, 36]);
+const ADAPTER_LOG_MARKERS = [
+	"playable-adapter-core",
+	"playable-ads-adapter",
+	"[适配]",
+	"[打包]",
+	"[合并]",
+	"[压缩]",
+	"[创建zip文件]",
+	"【执行图片压缩】",
+	"【生成单文件】",
+	"【生成渠道包】",
+];
 
 const serializeError = (error: unknown) => {
 	if (error instanceof Error) {
@@ -411,15 +423,31 @@ const runAdapterChildProcess = (
 	});
 };
 
+const stripCocosLogEnvelope = (line: string) => {
+	const match = line.match(
+		/^\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}:\d{2}\s+-\s+(debug|log|info|warn|error):\s?(.*)$/,
+	);
+	return match ? match[2] : line;
+};
+
+const shouldForwardCliLog = (line: string) => {
+	const message = stripCocosLogEnvelope(line);
+	return ADAPTER_LOG_MARKERS.some((marker) => message.includes(marker));
+};
+
 const createLineLogger = (log: (message: string) => void) => {
 	let pending = "";
 
-	const flush = () => {
-		const message = pending.trim();
-		pending = "";
-		if (message) {
-			log(message);
+	const forward = (line: string) => {
+		const message = line.trim();
+		if (message && shouldForwardCliLog(message)) {
+			log(stripCocosLogEnvelope(message));
 		}
+	};
+
+	const flush = () => {
+		forward(pending);
+		pending = "";
 	};
 
 	return {
@@ -427,11 +455,9 @@ const createLineLogger = (log: (message: string) => void) => {
 			pending += data.toString();
 			let newlineIndex = pending.indexOf("\n");
 			while (newlineIndex >= 0) {
-				const line = pending.slice(0, newlineIndex).trim();
+				const line = pending.slice(0, newlineIndex);
 				pending = pending.slice(newlineIndex + 1);
-				if (line) {
-					log(line);
-				}
+				forward(line);
 				newlineIndex = pending.indexOf("\n");
 			}
 		},
