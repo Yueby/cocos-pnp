@@ -4,13 +4,17 @@ import {
 	parseAdapterLogLevel,
 	type TLogPayload,
 } from "@/extensions/logger";
-import { getAdapterConfig, getRCSkipBuild } from "@/extensions/utils";
+import {
+	checkOSPlatform,
+	getAdapterConfig,
+	getRCSkipBuild,
+	getRealPath,
+} from "@/extensions/utils";
 import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import { shell } from "electron";
 import {
 	existsSync,
 	readdirSync,
-	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "fs";
@@ -21,27 +25,6 @@ import type { IBuildTaskOption } from "~types/packages/builder/@types";
 type TBuildParams = {
 	buildFolderPath: string;
 	adapterBuildConfig: TAdapterRC;
-};
-
-type TBuildProfileTask = {
-	options?: Partial<IBuildTaskOption>;
-};
-
-type TBuildProfile = {
-	common?: Partial<IBuildTaskOption>;
-	BuildTaskManager?: {
-		taskMap?: Record<string, TBuildProfileTask>;
-	};
-};
-
-type TBuildTaskOptions = Partial<IBuildTaskOption> & {
-	id: string;
-	taskId: string;
-	platform: TPlatform;
-	outputName: string;
-	taskName: string;
-	buildPath: string;
-	packages: Record<string, unknown>;
 };
 
 type TAdapterRunnerMessage = {
@@ -84,15 +67,15 @@ type TBuildState = {
 };
 
 let activeTaskId: string | null = null;
-let runningTempTaskId: string | null = null;
+let activeCocosBuildChild: ChildProcessWithoutNullStreams | null = null;
 let activeAdapterChild: ChildProcessWithoutNullStreams | null = null;
 let adapterCancelError: Error | null = null;
 
 const ADAPTER_RUNNER_FILE = "adapter-runner.js";
 const ADAPTER_RUNNER_TIMEOUT_MS = 60 * 60 * 1000;
 const ADAPTER_RUNNER_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
-const BUILD_TASK_TIMEOUT_MS = 30 * 60 * 1000;
-const BUILD_TASK_POLL_INTERVAL_MS = 3000;
+const BUILD_PROCESS_TIMEOUT_MS = 30 * 60 * 1000;
+const BUILD_PROCESS_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
 const serializeError = (error: unknown) => {
 	if (error instanceof Error) {
@@ -150,15 +133,10 @@ const notifyBuildState = (
 };
 
 export const cancelBuild = async () => {
-	if (runningTempTaskId) {
-		try {
-			logger.warn(`正在停止临时 Cocos 构建任务: ${runningTempTaskId}`);
-			await Editor.Message.request("builder", "break-task", runningTempTaskId);
-			return true;
-		} catch (error) {
-			logger.error("停止临时 Cocos 构建任务失败:", error);
-			return false;
-		}
+	if (activeCocosBuildChild) {
+		logger.warn("正在终止 Cocos Creator CLI 构建进程...");
+		activeCocosBuildChild.kill();
+		return true;
 	}
 
 	if (activeAdapterChild) {
@@ -437,166 +415,162 @@ const runAdapterChildProcess = (
 	});
 };
 
-const getBuilderProfilePath = () =>
-	join(Editor.Project.path, "profiles", "v2", "packages", "builder.json");
+const createLineLogger = (log: (message: string) => void) => {
+	let pending = "";
 
-const parseBuildProfile = (content: string): TBuildProfile => {
-	const parsed: unknown = JSON.parse(content);
-	return typeof parsed === "object" && parsed !== null ? parsed : {};
-};
-
-const getRecord = (value: unknown): Record<string, unknown> =>
-	typeof value === "object" && value !== null
-		? (value as Record<string, unknown>)
-		: {};
-
-const readBuilderOptions = (
-	buildPlatform: TPlatform,
-	taskId: string,
-): TBuildTaskOptions => {
-	const profilePath = getBuilderProfilePath();
-	let profile: TBuildProfile = {};
-	if (existsSync(profilePath)) {
-		try {
-			profile = parseBuildProfile(readFileSync(profilePath, "utf-8"));
-		} catch (error) {
-			logger.warn("读取 Cocos 构建配置失败，将使用默认配置:", error);
+	const flush = () => {
+		const message = pending.trim();
+		pending = "";
+		if (message) {
+			log(message);
 		}
-	}
-
-	const latestTask = Object.values(profile.BuildTaskManager?.taskMap || {})
-		.map((task) => task.options)
-		.filter((options) => options?.platform === buildPlatform)
-		.sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0))[0];
+	};
 
 	return {
-		...(profile.common || {}),
-		...(latestTask || {}),
-		id: taskId,
-		taskId,
-		platform: buildPlatform,
-		outputName: buildPlatform,
-		taskName: `${buildPlatform}-playable-temp`,
-		buildPath:
-			profile.common?.buildPath || latestTask?.buildPath || "project://build",
-		packages: getRecord(latestTask?.packages),
+		write(data: Buffer) {
+			pending += data.toString();
+			let newlineIndex = pending.indexOf("\n");
+			while (newlineIndex >= 0) {
+				const line = pending.slice(0, newlineIndex).trim();
+				pending = pending.slice(newlineIndex + 1);
+				if (line) {
+					log(line);
+				}
+				newlineIndex = pending.indexOf("\n");
+			}
+		},
+		flush,
 	};
 };
 
-const removeBuildTask = async (taskId: string) => {
-	try {
-		await Editor.Message.request("builder", "remove-task", taskId, false);
-		logger.debug(`已删除临时 Cocos 构建任务: ${taskId}`);
-	} catch (error) {
-		logger.warn(`删除临时 Cocos 构建任务失败: ${taskId}`, error);
-	}
-};
-
-const cleanupStaleTempTasks = async (exceptTaskId?: string | null) => {
-	try {
-		const info = await Editor.Message.request("builder", "query-tasks-info");
-		const taskIds = Object.keys(info.queue || {}).filter(
-			(taskId) => taskId.startsWith("playable-") && taskId !== exceptTaskId,
+const resolveCocosCreatorBinary = () => {
+	const platform = checkOSPlatform();
+	if (platform === "MAC") {
+		return Editor.App.path.replace(
+			"/Resources/app.asar",
+			"/MacOS/CocosCreator",
 		);
-		await Promise.all(taskIds.map((taskId) => removeBuildTask(taskId)));
-	} catch (error) {
-		logger.warn("清理历史临时 Cocos 构建任务失败:", error);
 	}
+	if (platform === "WINDOWS") {
+		return getRealPath(Editor.App.path).replace(
+			"/resources/app.asar",
+			"/CocosCreator.exe",
+		);
+	}
+	throw new Error(`不支持${platform}平台构建`);
 };
 
-const createBuildTaskWatcher = (taskId: string) => {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	let stopped = false;
-	let hasSeenTask = false;
-	const startedAt = Date.now();
+const runBuilder = (buildPlatform: TPlatform) => {
+	return new Promise<void>((resolve, reject) => {
+		let settled = false;
+		let idleTimer: ReturnType<typeof setTimeout> | undefined;
+		let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+		let lastOutputAt = Date.now();
 
-	const stop = () => {
-		stopped = true;
-		if (timer) clearTimeout(timer);
-	};
-
-	const promise = new Promise<number>((resolve, reject) => {
-		const poll = async () => {
-			if (stopped) return;
-			try {
-				const task = await Editor.Message.request(
-					"builder",
-					"query-task",
-					taskId,
-				);
-				if (task) {
-					hasSeenTask = true;
-				}
-				if (task?.state === "success") {
-					stop();
-					resolve(36);
-					return;
-				}
-				if (task?.state === "failure") {
-					stop();
-					reject(new Error(task.message || "Cocos Creator 构建任务已中断"));
-					return;
-				}
-			} catch (error) {
-				if (hasSeenTask) {
-					stop();
-					reject(new Error(`Cocos Creator 构建任务已被外部移除: ${taskId}`));
-					return;
-				}
+		const cleanup = () => {
+			if (idleTimer) clearTimeout(idleTimer);
+			if (timeoutTimer) clearTimeout(timeoutTimer);
+			if (activeCocosBuildChild === processRef) {
+				activeCocosBuildChild = null;
 			}
-
-			if (Date.now() - startedAt > BUILD_TASK_TIMEOUT_MS) {
-				stop();
-				reject(
-					new Error(
-						`Cocos Creator 构建任务超过 ${BUILD_TASK_TIMEOUT_MS / 1000} 秒未完成`,
-					),
-				);
-				return;
-			}
-
-			timer = setTimeout(poll, BUILD_TASK_POLL_INTERVAL_MS);
 		};
 
-		poll();
-	});
+		const finishSuccess = () => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			resolve();
+		};
 
-	return { promise, stop };
-};
+		const finishFail = (error: unknown) => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			reject(error);
+		};
 
-const runBuilder = async (buildPlatform: TPlatform, taskId: string) => {
-	runningTempTaskId = taskId;
-	logger.log("使用 Cocos 当前编辑器构建任务执行构建");
-	const buildOptions = readBuilderOptions(buildPlatform, taskId);
-	const watcher = createBuildTaskWatcher(taskId);
-	const adapterPackageOptions = getRecord(buildOptions.packages[BUILDER_NAME]);
-	try {
-		const result = await Promise.race([
-			Editor.Message.request(
-				"builder",
-				"add-task",
-				{
-					...buildOptions,
-					packages: {
-						...buildOptions.packages,
-						[BUILDER_NAME]: {
-							...adapterPackageOptions,
-							[SKIP_ADAPTER_HOOK_ENV]: true,
-						},
-					},
-				},
-				true,
-			),
-			watcher.promise,
-		]);
-		if (result === 0 || result === 36) {
+		let cocosBuilderPath: string;
+		try {
+			cocosBuilderPath = resolveCocosCreatorBinary();
+		} catch (error) {
+			reject(error);
 			return;
 		}
-		throw new Error(`Cocos Creator 构建任务失败，返回码 ${result}`);
-	} finally {
-		watcher.stop();
-		runningTempTaskId = null;
-	}
+
+		logger.log("使用 Cocos Creator CLI 后台进程执行构建");
+		logger.debug(`Cocos Creator CLI 路径: ${cocosBuilderPath}`);
+
+		const processRef = spawn(
+			cocosBuilderPath,
+			["--project", Editor.Project.path, "--build", `platform=${buildPlatform}`],
+			{
+				env: {
+					...process.env,
+					[SKIP_ADAPTER_HOOK_ENV]: "1",
+				},
+				shell: false,
+				windowsHide: true,
+			},
+		);
+		activeCocosBuildChild = processRef;
+
+		const stdoutLogger = createLineLogger((message) => logger.log(message));
+		const stderrLogger = createLineLogger((message) => logger.warn(message));
+
+		const killProcess = (message: string) => {
+			if (settled) return;
+			logger.error(message);
+			processRef.kill();
+			finishFail(new Error(message));
+		};
+
+		const resetIdleTimer = () => {
+			lastOutputAt = Date.now();
+			if (idleTimer) clearTimeout(idleTimer);
+			idleTimer = setTimeout(() => {
+				const idleSeconds = ((Date.now() - lastOutputAt) / 1000).toFixed(0);
+				killProcess(
+					`Cocos Creator 构建超过 ${idleSeconds} 秒无日志输出，已终止构建`,
+				);
+			}, BUILD_PROCESS_IDLE_TIMEOUT_MS);
+		};
+
+		timeoutTimer = setTimeout(
+			() =>
+				killProcess(
+					`Cocos Creator 构建超过 ${BUILD_PROCESS_TIMEOUT_MS / 1000} 秒，已终止构建`,
+				),
+			BUILD_PROCESS_TIMEOUT_MS,
+		);
+		resetIdleTimer();
+
+		processRef.stdout.on("data", (data: Buffer) => {
+			resetIdleTimer();
+			stdoutLogger.write(data);
+		});
+		processRef.stderr.on("data", (data: Buffer) => {
+			resetIdleTimer();
+			stderrLogger.write(data);
+		});
+		processRef.on("error", (error) => {
+			stdoutLogger.flush();
+			stderrLogger.flush();
+			finishFail(error);
+		});
+		processRef.on("close", (code, signal) => {
+			stdoutLogger.flush();
+			stderrLogger.flush();
+			if (code === 0) {
+				finishSuccess();
+				return;
+			}
+			finishFail(
+				new Error(
+					`Cocos Creator CLI 构建失败，退出码 ${code ?? "null"}，信号 ${signal ?? "null"}`,
+				),
+			);
+		});
+	});
 };
 
 export const initBuildStartEvent = async (
@@ -695,22 +669,18 @@ export const builder = async () => {
 		const tempTaskId = isSkipBuild ? null : `playable-${Date.now()}`;
 		activeTaskId = tempTaskId;
 		notifyBuildState(true, undefined, tempTaskId || undefined);
-		await cleanupStaleTempTasks(tempTaskId);
 		await initBuildStartEvent({
 			platform: buildPlatform,
 		});
 		try {
-			if (!isSkipBuild && tempTaskId) {
-				await runBuilder(buildPlatform, tempTaskId);
+			if (!isSkipBuild) {
+				await runBuilder(buildPlatform);
 			}
 			await initBuildFinishedEvent({
 				platform: buildPlatform,
 			});
 			logger.log("构建完成");
 		} finally {
-			if (tempTaskId) {
-				await removeBuildTask(tempTaskId);
-			}
 			activeTaskId = null;
 		}
 		shell.openPath(buildPath);

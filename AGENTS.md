@@ -113,7 +113,7 @@ unmountGlobalVars()
 
 - `src/main.ts`：Cocos 扩展入口，通过 `configs` 注册 `hooks` 和 `panel`，通过 `methods` 暴露 `builder` 与 `updateLanguage`。
 - `src/hooks.ts`：构建生命周期入口，连接 `onBeforeBuild` / `onAfterBuild` 与 builder。
-- `src/extensions/builder/index.ts`：构建编排层，读取配置、处理 `skipBuild`、通过 Cocos 当前编辑器 `add-task` 执行构建，并用外部 Node 子进程运行适配。
+- `src/extensions/builder/index.ts`：构建编排层，读取配置、处理 `skipBuild`、通过 Cocos Creator CLI 后台进程执行构建，并用外部 Node 子进程运行适配。
 - `src/extensions/adapter-runner.ts`：外部 Node 子进程入口，调用 core 的 `execAdapter`，通过 JSON line 协议把日志和完成状态回传给 builder。
 - `src/extensions/worker/index.ts`：历史 worker 入口，当前发布/适配主流程不再依赖 `worker_threads`，优先保持外部 Node 子进程隔离。
 - `src/extensions/utils/file-system/adapterrc.ts`：读取 `.adapterrc.json` / `.adapterrc`，区分构建时读取和面板读取。
@@ -127,7 +127,7 @@ unmountGlobalVars()
 ```text
 panel.ts（用户交互 / 配置编辑）
   ↓
-builder/index.ts（组装参数 / Cocos add-task / skipBuild / 状态与取消）
+builder/index.ts（组装参数 / Cocos Creator CLI / skipBuild / 状态与取消）
   ↓
 adapter-runner.ts（外部 Node 子进程执行 / JSON line 日志回传）
   ↓
@@ -144,7 +144,7 @@ sharp-worker.js（图片压缩优先使用外部 Node 子进程）
 - 面板字段变更通常要同步 `config.ts`、`panel.ts` 和配置读写逻辑。
 - `adapter-runner.ts` 通过 stdout JSON line 回传日志和完成状态，修改时不要破坏 `adapter:<level>` / `adapter:finished` 消息协议。
 - 调用 core 的参数形状应保持为 `buildFolderPath` + `adapterBuildConfig`，并由 builder 补充 `buildPlatform` / `orientation`。
-- 构建流程中要保证 `buildState.notify(true/false)` 不会因异常路径导致面板 loading 卡死；取消按钮应同时能中断 Cocos 临时构建任务和适配子进程。
+- 构建流程中要保证 `buildState.notify(true/false)` 不会因异常路径导致面板 loading 卡死；取消按钮应同时能中断 Cocos Creator CLI 构建进程和适配子进程。
 - `rollup.config.js` 固定 Cocos Creator 3.8.x+ 入口；修改入口、alias、adapter-runner、sharp-worker 或 panel 路径时必须同步检查构建配置。
 - `assets/Playable.ts` 是运行时脚本，不要混入编辑器侧逻辑。
 
