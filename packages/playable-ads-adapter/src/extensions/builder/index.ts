@@ -71,6 +71,7 @@ const ADAPTER_RUNNER_TIMEOUT_MS = 60 * 60 * 1000;
 const ADAPTER_RUNNER_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const BUILD_PROCESS_TIMEOUT_MS = 30 * 60 * 1000;
 const BUILD_PROCESS_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const BUILD_SUCCESS_EXIT_CODES = new Set([0, 36]);
 
 const serializeError = (error: unknown) => {
 	if (error instanceof Error) {
@@ -560,7 +561,7 @@ const runBuilder = (buildPlatform: TPlatform) => {
 		processRef.on("close", (code, signal) => {
 			stdoutLogger.flush();
 			stderrLogger.flush();
-			if (code === 0) {
+			if (typeof code === "number" && BUILD_SUCCESS_EXIT_CODES.has(code)) {
 				finishSuccess();
 				return;
 			}
