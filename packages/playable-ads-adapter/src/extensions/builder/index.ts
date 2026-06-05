@@ -12,12 +12,7 @@ import {
 } from "@/extensions/utils";
 import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import { shell } from "electron";
-import {
-	existsSync,
-	readdirSync,
-	rmSync,
-	writeFileSync,
-} from "fs";
+import { existsSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { delimiter, join } from "path";
 import type { IBuildTaskOption } from "~types/packages/builder/@types";
@@ -502,7 +497,12 @@ const runBuilder = (buildPlatform: TPlatform) => {
 
 		const processRef = spawn(
 			cocosBuilderPath,
-			["--project", Editor.Project.path, "--build", `platform=${buildPlatform}`],
+			[
+				"--project",
+				Editor.Project.path,
+				"--build",
+				`platform=${buildPlatform}`,
+			],
 			{
 				env: {
 					...process.env,
